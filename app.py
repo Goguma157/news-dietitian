@@ -5,160 +5,198 @@ import json
 import requests
 import time
 
-# 1. 페이지 설정
+# 1. 페이지 설정 (브라우저 탭 제목과 아이콘)
 st.set_page_config(page_title="News Dietitian", page_icon="⚖️", layout="wide")
 
-# CSS 스타일 (전문적인 디자인)
+# ==========================================
+# 🎨 깔끔한 디자인을 위한 CSS 스타일
+# ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Pretendard', sans-serif !important; color: #1a1a1a; }
-    div[data-testid="stContainer"] { background-color: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; }
-    .insight-card { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #0f172a; height: 100%; word-break: keep-all; }
-    .fact-header { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 5px; }
-    .fact-content { font-size: 16px; font-weight: 600; color: #0f172a; line-height: 1.4; }
-    .badge-valid { background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 5px; }
-    .badge-ref { background-color: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-right: 5px; }
+    
+    html, body, [class*="css"] {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+        color: #1a1a1a;
+    }
+    
+    /* 뉴스 카드 테두리 및 그림자 */
+    div[data-testid="stContainer"] {
+        background-color: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        transition: transform 0.2s ease;
+    }
+    
+    /* 분석 결과 카드 스타일 */
+    .insight-card {
+        background-color: #f8f9fa;
+        padding: 18px;
+        border-radius: 10px;
+        border-left: 4px solid #0f172a; 
+        margin-bottom: 12px;
+        height: 100%;
+    }
+    
+    .fact-header {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+    
+    .fact-content {
+        font-size: 15px;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.4;
+    }
+
+    /* 팩트 체크 배지 */
+    .badge-valid {
+        background-color: #dcfce7;
+        color: #166534;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-right: 5px;
+    }
+    
+    h1 { font-weight: 800 !important; letter-spacing: -1px; color: #111827; }
 </style>
 """, unsafe_allow_html=True)
 
+# 2. AI 설정
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
-    pass 
+    st.error("API Key를 Secrets에 정확히 입력해주세요.")
 
+# ==========================================
+# ⚡ 기능 1: 뉴스 데이터 가져오기 (캐싱 적용)
+# ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_news_data(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=3)
+        response = requests.get(url, headers=headers, timeout=5)
         return feedparser.parse(response.content) if response.status_code == 200 else None
     except:
         return None
 
-# 🛡️ [심플 & 강력] 1.5 Flash 고정 버전
+# ==========================================
+# 🧠 기능 2: AI 심층 분석 (Gemini 1.5 Flash 사용)
+# ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
+    # 새 프로젝트 키 덕분에 이제 'gemini-1.5-flash'를 바로 쓸 수 있습니다!
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
     prompt = f"""
-    당신은 '수석 정치 평론가'입니다. 제공된 뉴스를 분석하여 JSON으로 출력하세요.
-    이면의 의도나 맥락을 날카롭게 짚어내되, 문장은 '개조식'으로 간결하게 작성하세요.
-    
-    [뉴스]: {news_text[:2500]} 
-    
-    [JSON 형식] (반드시 이 형식을 지키세요):
+    당신은 객관적이고 날카로운 '수석 뉴스 분석가'입니다. 
+    뉴스를 분석하여 다음 JSON 형식으로 대답하세요. 
+    답변은 군더더기 없이 명사형 문장(개조식)으로 짧고 굵게 작성하세요.
+
+    [뉴스 내용]: {news_text[:2000]}
+
+    [JSON 형식]:
     {{
-        "title": "본질을 꿰뚫는 제목 (25자 내)",
+        "title": "본질을 꿰뚫는 제목 (20자 내외)",
         "summary": "핵심 요약 (1문장)",
         "metrics": {{
-            "who": "주체",
+            "who": "주체(인물/기관)",
             "whom": "대상",
             "action": "핵심 행위",
-            "impact": "파장/의미"
+            "impact": "예상되는 파장"
         }},
         "fact_check": {{
-            "verified": ["확인된 팩트1", "팩트2"],
-            "controversial": ["논란/맥락"],
-            "logic": "판단 근거 (1문장)"
+            "verified": ["확인된 팩트 1", "팩트 2"],
+            "controversial": ["논란 혹은 숨겨진 배경"],
+            "logic": "분석의 핵심 근거 (1문장)"
         }},
-        "balance_sheet": {{
-            "side_a": "명분 (A측)",
-            "side_b": "의도/반론 (B측)",
-            "editor_note": "관전 포인트 (1문장)"
+        "balance": {{
+            "stated": "표면적으로 내세운 명분",
+            "hidden": "누락되었거나 숨겨진 의도/반론",
+            "note": "관전 포인트 (한 줄 평)"
         }}
     }}
     """
     
-    # 💡 새 키를 받으면 이 모델은 무조건 됩니다! (가성비 최고 모델)
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        response = model.generate_content(
-            prompt, 
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=1500,
-                temperature=0.3,
-                response_mime_type="application/json"
-            )
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.types.GenerationConfig(
+            max_output_tokens=1000,
+            temperature=0.3, # 적당한 창의성으로 통찰력 부여
+            response_mime_type="application/json" # JSON 에러 방지
         )
-        return json.loads(response.text)
-        
-    except Exception as e:
-        return {
-            "title": "분석 일시 오류",
-            "summary": "AI 연결에 실패했습니다. 키 설정을 확인해주세요.",
-            "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
-            "fact_check": {"verified": [], "controversial": [], "logic": "API Error"},
-            "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {str(e)}"}
-        }
+    )
+    return json.loads(response.text)
 
-st.title("⚖️ News Dietitian (Pro)")
-st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Deep Insight, Fast Delivery</div>", unsafe_allow_html=True)
+# ==========================================
+# 🖥️ 메인 화면 구성
+# ==========================================
+st.title("⚖️ NEWS DIETITIAN")
+st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px;'>Fast & Objective News Intelligence</div>", unsafe_allow_html=True)
 
+# SBS 뉴스 RSS 사용
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
 news = fetch_news_data(rss_url)
 
 if news and len(news.entries) > 0:
-    cols = st.columns(3)
+    cols = st.columns(3) # 3열 레이아웃
+    
     for i in range(min(12, len(news.entries))):
         entry = news.entries[i]
         with cols[i % 3]:
             with st.container(border=True):
-                st.markdown(f"<div style='font-size: 11px; color: #999;'>{entry.published[:16]}</div>", unsafe_allow_html=True)
-                st.markdown(f"<div style='font-size: 15px; font-weight: 700; height: 45px; overflow: hidden; margin-bottom:10px;'>{entry.title}</div>", unsafe_allow_html=True)
+                st.caption(f"{entry.published[:16]}")
+                st.markdown(f"**{entry.title}**")
                 
-                if st.button("⚖️ 심층 분석", key=f"btn_{i}", use_container_width=True, type="primary"):
-                    if "GEMINI_API_KEY" not in st.secrets:
-                         st.error("Key Error")
-                    else:
-                        bar = st.progress(10, text="📡 데이터 수집 중...")
+                # 심층 분석 버튼
+                if st.button("✨ Deep Analysis", key=f"btn_{i}", use_container_width=True, type="primary"):
+                    with st.spinner("AI 분석 중..."):
                         try:
                             start_time = time.time()
+                            input_text = f"제목: {entry.title}\n내용: {entry.description}"
                             
-                            input_text = f"{entry.title}\n{entry.description}"
-                            time.sleep(0.1) 
-                            bar.progress(40, text="🧠 AI가 맥락을 분석 중...")
-                            
+                            # AI 분석 실행
                             res = analyze_news_with_ai(input_text)
                             
-                            bar.progress(100, text="✨ 리포트 생성 완료!")
-                            time.sleep(0.2)
-                            bar.empty()
-                            
-                            # --- 결과 표시 ---
+                            # --- 결과 출력 ---
                             st.markdown("---")
-                            st.markdown(f"### {res['title']}")
-                            st.markdown(f"<div style='background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-style: italic; color: #4b5563; margin-bottom: 20px;'>“{res['summary']}”</div>", unsafe_allow_html=True)
+                            st.markdown(f"#### {res['title']}")
+                            st.info(res['summary'])
                             
-                            st.markdown("<div class='fact-header'>ANALYSIS MATRIX</div>", unsafe_allow_html=True)
-                            r1c1, r1c2 = st.columns(2)
-                            with r1c1: st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO (주체)</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
-                            with r1c2: st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM (대상)</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
-                            
-                            r2c1, r2c2 = st.columns(2)
-                            with r2c1: st.markdown(f"<div class='insight-card' style='margin-top:10px'><div class='fact-header'>KEY ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
-                            with r2c2: st.markdown(f"<div class='insight-card' style='margin-top:10px'><div class='fact-header'>IMPACT / INSIGHT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
+                            # 2x2 매트릭스 레이아웃
+                            m1, m2 = st.columns(2)
+                            with m1:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
+                            with m2:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
 
-                            st.markdown("", unsafe_allow_html=True)
-                            st.markdown("<div class='fact-header' style='margin-top: 20px;'>FACT CHECK & LOGIC</div>", unsafe_allow_html=True)
-                            st.caption(f"💡 판단 근거: {res['fact_check']['logic']}")
-                            
-                            t1, t2 = st.tabs(["✅ 검증된 팩트", "🔍 맥락/논란"])
+                            # 팩트 및 균형 탭
+                            t1, t2 = st.tabs(["✅ Fact & Logic", "⚖️ Perspective"])
                             with t1:
-                                for f in res['fact_check']['verified']: st.markdown(f"<span class='badge-valid'>FACT</span> {f}", unsafe_allow_html=True)
+                                for f in res['fact_check']['verified']:
+                                    st.markdown(f"<span class='badge-valid'>팩트</span> {f}", unsafe_allow_html=True)
+                                st.caption(f"근거: {res['fact_check']['logic']}")
+                            
                             with t2:
-                                for c in res['fact_check']['controversial']: st.markdown(f"<span class='badge-ref'>CTX</span> {c}", unsafe_allow_html=True)
+                                st.success(f"**명분:** {res['balance']['stated']}")
+                                st.warning(f"**이면:** {res['balance']['hidden']}")
                             
-                            st.markdown("<div class='fact-header' style='margin-top: 20px;'>PERSPECTIVE</div>", unsafe_allow_html=True)
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.markdown(f"""<div style='border:1px solid #e5e7eb; padding:15px; border-radius:8px;'><strong style='color:#059669'>🗣 명분/주장</strong><br>{res['balance_sheet']['side_a']}</div>""", unsafe_allow_html=True)
-                            with c2:
-                                st.markdown(f"""<div style='border:1px solid #e5e7eb; padding:15px; border-radius:8px; background:#fef2f2'><strong style='color:#dc2626'>🕵️ 의도/이면</strong><br>{res['balance_sheet']['side_b']}</div>""", unsafe_allow_html=True)
-                            
-                            st.info(f"🧐 **Editor's Insight:** {res['balance_sheet']['editor_note']}")
+                            st.write(f"🧐 **Editor's Note:** {res['balance']['note']}")
                             
                             end_time = time.time()
-                            st.caption(f"⏱️ 분석 소요 시간: {round(end_time - start_time, 2)}초")
-
+                            st.caption(f"⏱️ 분석 시간: {round(end_time - start_time, 2)}초")
+                            
                         except Exception as e:
-                            st.error(f"Error: {e}")
+                            st.error(f"분석 중 오류 발생: {e}")
+                
+                # 원문 링크 버튼
+                st.link_button("Read Full Article", entry.link, use_container_width=True)
