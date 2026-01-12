@@ -3,12 +3,13 @@ import feedparser
 import google.generativeai as genai
 import json
 import requests
+import time
 
 # 1. 페이지 설정
 st.set_page_config(page_title="News Dietitian", page_icon="📰", layout="wide")
 
 # ==========================================
-# 🎨 [디자인 업그레이드] CSS 커스텀 스타일
+# 🎨 CSS 스타일 (디자인 유지)
 # ==========================================
 st.markdown("""
 <style>
@@ -18,15 +19,12 @@ st.markdown("""
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
         color: #1a1a1a;
     }
-    
     div[data-testid="stContainer"] {
         background-color: #ffffff;
         border-radius: 12px;
         border: 1px solid #e5e7eb;
         transition: box-shadow 0.3s ease;
     }
-    
-    /* [수정됨] 분석 결과 박스 스타일: 너비 문제 해결 */
     .insight-card {
         background-color: #f8f9fa;
         padding: 20px;
@@ -34,10 +32,9 @@ st.markdown("""
         border-left: 5px solid #0f172a; 
         margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        height: 100%; /* 높이 맞춤 */
-        word-break: keep-all; /* [중요] 한국어 단어 중간에 줄바꿈 방지 */
+        height: 100%;
+        word-break: keep-all;
     }
-    
     .fact-header {
         font-size: 13px;
         font-weight: 700;
@@ -46,14 +43,12 @@ st.markdown("""
         letter-spacing: 1px;
         margin-bottom: 8px;
     }
-    
     .fact-content {
         font-size: 17px;
         font-weight: 600;
         color: #0f172a;
-        line-height: 1.5; /* 줄 간격 확보 */
+        line-height: 1.5;
     }
-    
     .badge-valid {
         background-color: #dcfce7;
         color: #166534;
@@ -64,7 +59,6 @@ st.markdown("""
         display: inline-block;
         margin-right: 5px;
     }
-    
     .badge-ref {
         background-color: #f1f5f9;
         color: #475569;
@@ -75,18 +69,38 @@ st.markdown("""
         display: inline-block;
         margin-right: 5px;
     }
-    
     h1 { font-weight: 800 !important; letter-spacing: -1px; color: #111827; }
     h2, h3 { font-weight: 700 !important; color: #374151; }
-    
 </style>
 """, unsafe_allow_html=True)
 
+# 2. 비밀 금고 세팅
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
     pass 
 
+# ==========================================
+# ⚡ [속도 최적화 1] 뉴스 가져오기 캐싱
+# ==========================================
+# ttl=600 : 한 번 뉴스를 가져오면 600초(10분) 동안은 저장된 걸 보여줌 (매번 접속 안 함)
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_news_data(url):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            return feedparser.parse(response.content)
+        else:
+            return None
+    except:
+        return None
+
+# ==========================================
+# ⚡ [속도 최적화 2] AI 분석 결과 캐싱
+# ==========================================
+# 같은 뉴스 내용(news_text)이라면, 다시 AI를 부르지 않고 저장된 결과를 즉시 리턴함
+@st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
     당신은 냉철한 데이터 기반의 '수석 뉴스 분석가'입니다.
@@ -121,20 +135,14 @@ def analyze_news_with_ai(news_text):
     text = response.text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
 
+# 3. 메인 UI 구성
 st.title("NEWS DIETITIAN")
 st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Objective News Analysis Dashboard</div>", unsafe_allow_html=True)
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
 
-try:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(rss_url, headers=headers, timeout=5)
-    if response.status_code == 200:
-        news = feedparser.parse(response.content)
-    else:
-        news = None
-except:
-    news = None
+# 캐싱된 함수 호출
+news = fetch_news_data(rss_url)
 
 if news is None or len(news.entries) == 0:
     st.error("System Error: Unable to fetch news feed.")
@@ -149,32 +157,33 @@ else:
                 st.markdown(f"<div style='font-size: 16px; font-weight: 700; line-height: 1.4; margin-bottom: 10px; height: 50px; overflow: hidden;'>{entry.title}</div>", unsafe_allow_html=True)
                 st.link_button("Read Original Article 🔗", entry.link, use_container_width=True)
                 
+                # 버튼을 누르면 분석 시작
                 if st.button("Deep Analysis ✨", key=f"btn_{i}", use_container_width=True, type="primary"):
                     if "GEMINI_API_KEY" not in st.secrets:
                          st.error("API Key Missing")
                     else:
-                        with st.spinner("Analyzing data structure..."):
+                        # 스피너는 UX를 위해 남겨둠
+                        with st.spinner("Processing Intelligence..."):
                             try:
                                 input_text = f"제목: {entry.title}\n내용: {entry.description}"
+                                
+                                # 여기서 캐싱된 함수를 부름!
+                                # 만약 이전에 분석한 적 있는 기사라면 0.1초 만에 결과가 나옴
                                 res = analyze_news_with_ai(input_text)
                                 
                                 st.markdown("---")
                                 st.markdown(f"### {res['title']}")
                                 st.markdown(f"<div style='background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-style: italic; color: #4b5563; margin-bottom: 20px;'>“{res['summary']}”</div>", unsafe_allow_html=True)
                                 
-                                # ==========================================
-                                # [수정됨] 2x2 그리드 레이아웃 (가로 확보)
-                                # ==========================================
+                                # 2x2 그리드 레이아웃
                                 st.markdown("<div class='fact-header'>KEY ENTITIES & IMPACT</div>", unsafe_allow_html=True)
                                 
-                                # 첫 번째 줄: WHO / WHOM
                                 row1_col1, row1_col2 = st.columns(2)
                                 with row1_col1:
                                     st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
                                 with row1_col2:
                                     st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
                                 
-                                # 두 번째 줄: ACTION / IMPACT
                                 row2_col1, row2_col2 = st.columns(2)
                                 with row2_col1:
                                     st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
