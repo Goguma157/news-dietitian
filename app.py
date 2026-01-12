@@ -36,7 +36,7 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🛡️ 최적화된 분석 함수
+# 🛡️ [만능 열쇠] 모델 자동 환승 함수
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
@@ -68,15 +68,25 @@ def analyze_news_with_ai(news_text):
     }}
     """
     
-    max_retries = 2
+    # 💡 [핵심 전략] 시도할 모델 리스트 (우선순위 순서대로)
+    # 1. 1.5-flash (가장 빠르고 넉넉함)
+    # 2. 1.5-flash-001 (버전 명시)
+    # 3. 1.5-flash-002 (다른 버전)
+    # 4. gemini-pro (구형이지만 안정적)
+    candidate_models = [
+        'gemini-1.5-flash', 
+        'gemini-1.5-flash-001', 
+        'gemini-1.5-flash-002', 
+        'gemini-pro',
+        'gemini-1.0-pro'
+    ]
+    
     last_error = ""
     
-    for attempt in range(max_retries):
+    # 리스트에 있는 모델들을 하나씩 꺼내서 시도해봄
+    for model_name in candidate_models:
         try:
-            # 💡 [핵심 변경] 아까 성공했던 'gemini-flash-latest'로 복귀!
-            # 사용자님 목록에 확실히 존재하고, 작동이 확인된 모델입니다.
-            model = genai.GenerativeModel('gemini-flash-latest')
-            
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content(
                 prompt, 
                 generation_config=genai.types.GenerationConfig(
@@ -85,18 +95,21 @@ def analyze_news_with_ai(news_text):
                     response_mime_type="application/json"
                 )
             )
+            # 성공하면 바로 결과(JSON)를 뱉고 함수 종료!
             return json.loads(response.text)
             
         except Exception as e:
+            # 실패하면 다음 모델로 넘어감 (조용히)
             last_error = str(e)
             continue
             
+    # 모든 모델이 실패했을 때만 에러 메시지 반환
     return {
         "title": "분석 일시 오류",
-        "summary": "AI 연결 상태가 좋지 않아 분석 정보를 가져오지 못했습니다.",
+        "summary": "모든 AI 모델이 응답하지 않습니다. (할당량 초과 또는 연결 문제)",
         "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
         "fact_check": {"verified": [], "controversial": [], "logic": "데이터 파싱 실패"},
-        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {last_error}"}
+        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error Info: {last_error}"}
     }
 
 st.title("⚖️ News Dietitian (Pro)")
