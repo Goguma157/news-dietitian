@@ -176,4 +176,54 @@ else:
                             # --- 결과 화면 ---
                             st.markdown("---")
                             st.markdown(f"### {res['title']}")
-                            st.markdown(f"
+                            st.markdown(f"<div style='background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-style: italic; color: #4b5563; margin-bottom: 20px;'>“{res['summary']}”</div>", unsafe_allow_html=True)
+                            
+                            st.markdown("<div class='fact-header'>KEY ENTITIES & IMPACT</div>", unsafe_allow_html=True)
+                            
+                            # 2x2 그리드
+                            row1_col1, row1_col2 = st.columns(2)
+                            with row1_col1:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
+                            with row1_col2:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
+                            
+                            row2_col1, row2_col2 = st.columns(2)
+                            with row2_col1:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
+                            with row2_col2:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
+
+                            st.markdown("<div class='fact-header' style='margin-top: 20px;'>FACT CHECK & CONTEXT</div>", unsafe_allow_html=True)
+                            st.caption(f"Logic: {res['fact_check']['logic']}")
+                            
+                            tab_a, tab_b = st.tabs(["VERIFIED FACTS", "CONTROVERSY / CONTEXT"])
+                            with tab_a:
+                                for item in res['fact_check']['verified']:
+                                    st.markdown(f"<div style='margin-bottom: 8px;'><span class='badge-valid'>FACT</span> {item}</div>", unsafe_allow_html=True)
+                            with tab_b:
+                                for item in res['fact_check']['controversial']:
+                                    st.markdown(f"<div style='margin-bottom: 8px;'><span class='badge-ref'>REF</span> {item}</div>", unsafe_allow_html=True)
+
+                            st.markdown("<div class='fact-header' style='margin-top: 20px;'>VIEWPOINT BALANCE</div>", unsafe_allow_html=True)
+                            col_l, col_r = st.columns(2)
+                            with col_l:
+                                st.markdown(f"""
+                                <div style='border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px;'>
+                                    <strong style='color: #059669;'>📢 STATED</strong><br><br>{res['balance_sheet']['side_a']}
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col_r:
+                                st.markdown(f"""
+                                <div style='border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #fef2f2;'>
+                                    <strong style='color: #dc2626;'>🔇 UNSTATED / MISSING</strong><br><br>{res['balance_sheet']['side_b']}
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            st.markdown(f"""
+                            <div style='margin-top: 15px; font-size: 13px; color: #6b7280; text-align: right;'>
+                                <strong>Editor's Note:</strong> {res['balance_sheet']['editor_note']}
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        except Exception as e:
+                            st.error(f"Analysis Failed: {e}")
