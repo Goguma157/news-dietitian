@@ -36,7 +36,35 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🛡️ [만능 열쇠] 모델 자동 환승 함수
+# 🧠 [스마트 기능] 사용 가능한 모델 자동 탐색
+@st.cache_data(show_spinner=False)
+def get_available_model_name():
+    """사용자 계정에서 실제 사용 가능한 모델 중 가장 적합한 것을 찾습니다."""
+    try:
+        valid_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                valid_models.append(m.name.replace('models/', ''))
+        
+        # 우선순위: 2.0 Flash (빠르고 성능 좋음) -> 기타 Flash -> 아무거나
+        # 1. gemini-2.0-flash (사용자님 목록에 있었음!)
+        if 'gemini-2.0-flash' in valid_models:
+            return 'gemini-2.0-flash'
+        
+        # 2. Flash가 들어간 아무 모델 (단, 2.5나 latest 같은 제한 걸린 것 제외 시도)
+        for m in valid_models:
+            if 'flash' in m and '2.5' not in m and 'latest' not in m:
+                return m
+        
+        # 3. 정 없으면 목록의 첫 번째 것
+        if valid_models:
+            return valid_models[0]
+            
+        return 'gemini-2.0-flash' # 최후의 수단
+    except:
+        return 'gemini-2.0-flash' # 에러나면 이걸로 시도
+
+# 분석 함수
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
@@ -68,25 +96,15 @@ def analyze_news_with_ai(news_text):
     }}
     """
     
-    # 💡 [핵심 전략] 시도할 모델 리스트 (우선순위 순서대로)
-    # 1. 1.5-flash (가장 빠르고 넉넉함)
-    # 2. 1.5-flash-001 (버전 명시)
-    # 3. 1.5-flash-002 (다른 버전)
-    # 4. gemini-pro (구형이지만 안정적)
-    candidate_models = [
-        'gemini-1.5-flash', 
-        'gemini-1.5-flash-001', 
-        'gemini-1.5-flash-002', 
-        'gemini-pro',
-        'gemini-1.0-pro'
-    ]
+    # 🔍 자동으로 찾은 모델 이름 사용
+    target_model = get_available_model_name()
     
+    max_retries = 2
     last_error = ""
     
-    # 리스트에 있는 모델들을 하나씩 꺼내서 시도해봄
-    for model_name in candidate_models:
+    for attempt in range(max_retries):
         try:
-            model = genai.GenerativeModel(model_name)
+            model = genai.GenerativeModel(target_model)
             response = model.generate_content(
                 prompt, 
                 generation_config=genai.types.GenerationConfig(
@@ -95,21 +113,18 @@ def analyze_news_with_ai(news_text):
                     response_mime_type="application/json"
                 )
             )
-            # 성공하면 바로 결과(JSON)를 뱉고 함수 종료!
             return json.loads(response.text)
             
         except Exception as e:
-            # 실패하면 다음 모델로 넘어감 (조용히)
             last_error = str(e)
             continue
             
-    # 모든 모델이 실패했을 때만 에러 메시지 반환
     return {
         "title": "분석 일시 오류",
-        "summary": "모든 AI 모델이 응답하지 않습니다. (할당량 초과 또는 연결 문제)",
+        "summary": f"연결 실패 (모델: {target_model})",
         "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
         "fact_check": {"verified": [], "controversial": [], "logic": "데이터 파싱 실패"},
-        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error Info: {last_error}"}
+        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {last_error}"}
     }
 
 st.title("⚖️ News Dietitian (Pro)")
@@ -134,10 +149,11 @@ if news and len(news.entries) > 0:
                         bar = st.progress(10, text="📡 데이터 수집 중...")
                         try:
                             start_time = time.time()
-                            
                             input_text = f"{entry.title}\n{entry.description}"
                             time.sleep(0.1) 
-                            bar.progress(40, text="🧠 AI가 맥락을 분석 중...")
+                            
+                            # 모델 찾는 중 메시지 표시 (잠깐 보임)
+                            bar.progress(30, text="🤖 사용 가능한 AI 모델 탐색 중...")
                             
                             res = analyze_news_with_ai(input_text)
                             
