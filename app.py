@@ -8,7 +8,7 @@ import time
 # 1. 페이지 설정
 st.set_page_config(page_title="News Dietitian", page_icon="⚖️", layout="wide")
 
-# CSS 스타일 (전문적인 디자인 유지)
+# CSS 스타일
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
@@ -40,49 +40,57 @@ def fetch_news_data(url):
 # AI 분석 캐싱
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
-    # ⚖️ [핵심 변경] "짧게 쓰되(Concise), 통찰력 있게(Insightful) 써라"
     prompt = f"""
-    당신은 '수석 정치 평론가'입니다. 
-    제공된 뉴스를 '고농도(High Density)'로 분석하여 JSON으로 출력하세요.
-    뻔한 내용은 생략하고, 이면의 의도나 맥락을 날카롭게 짚어내세요.
-    단, 문장은 간결한 '개조식(Bullet points style)'이나 '명사형 종결'을 사용하세요.
+    당신은 '수석 정치 평론가'입니다. 제공된 뉴스를 분석하여 JSON으로 출력하세요.
+    이면의 의도나 맥락을 날카롭게 짚어내되, 문장은 '개조식'으로 간결하게 작성하세요.
     
     [뉴스]: {news_text[:2000]} 
     
-    [JSON 형식]:
+    [JSON 형식] (반드시 이 형식을 지키세요):
     {{
         "title": "본질을 꿰뚫는 제목 (25자 내)",
-        "summary": "육하원칙에 입각한 핵심 요약 (1문장)",
+        "summary": "핵심 요약 (1문장)",
         "metrics": {{
-            "who": "주체 (직함 포함)",
+            "who": "주체",
             "whom": "대상",
-            "action": "핵심 행위 (구체적)",
-            "impact": "정치/사회적 파장 (통찰력 있게)"
+            "action": "핵심 행위",
+            "impact": "파장/의미"
         }},
         "fact_check": {{
-            "verified": ["확인된 팩트 1", "확인된 팩트 2"],
-            "controversial": ["논란/의혹/참고 (맥락 포함)"],
-            "logic": "위 판단의 논리적 근거 (1문장, 핵심만)"
+            "verified": ["확인된 팩트1", "팩트2"],
+            "controversial": ["논란/맥락"],
+            "logic": "판단 근거 (1문장)"
         }},
         "balance_sheet": {{
-            "side_a": "표면적 명분 (A측)",
-            "side_b": "실질적 의도/반론 (B측)",
-            "editor_note": "이 사건을 바라보는 관전 포인트 (한 줄 평)"
+            "side_a": "명분 (A측)",
+            "side_b": "의도/반론 (B측)",
+            "editor_note": "관전 포인트 (1문장)"
         }}
     }}
     """
     
-    model = genai.GenerativeModel('gemini-flash-latest')
-    response = model.generate_content(
-        prompt, 
-        generation_config=genai.types.GenerationConfig(
-            # ⚖️ 밸런스 조절: 창의성(0.3)을 주고 토큰(700)을 늘려서 깊이를 확보
-            max_output_tokens=700,
-            temperature=0.3
+    try:
+        model = genai.GenerativeModel('gemini-flash-latest')
+        response = model.generate_content(
+            prompt, 
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=1000,
+                temperature=0.3,
+                # 🛡️ [핵심 수정] 강제로 JSON 모드를 켜서 문법 오류를 원천 차단함
+                response_mime_type="application/json"
+            )
         )
-    )
-    text = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(text)
+        return json.loads(response.text)
+        
+    except Exception as e:
+        # 🛡️ [안전장치] 만약 그래도 에러가 나면, 앱이 멈추지 않고 '실패 데이터'를 반환하게 함
+        return {
+            "title": "분석 일시 오류",
+            "summary": "AI가 응답을 생성하는 과정에서 문법 오류가 발생했습니다. 다시 시도해주세요.",
+            "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
+            "fact_check": {"verified": [], "controversial": [], "logic": "데이터 파싱 실패"},
+            "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {str(e)}"}
+        }
 
 st.title("⚖️ News Dietitian (Pro)")
 st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Deep Insight, Fast Delivery</div>", unsafe_allow_html=True)
@@ -103,17 +111,14 @@ if news and len(news.entries) > 0:
                     if "GEMINI_API_KEY" not in st.secrets:
                          st.error("Key Error")
                     else:
-                        # 진행바 텍스트를 좀 더 있어 보이게 변경
                         bar = st.progress(10, text="📡 데이터 수집 중...")
                         try:
                             start_time = time.time()
                             
-                            # 데이터 준비
                             input_text = f"{entry.title}\n{entry.description}"
                             time.sleep(0.1) 
-                            bar.progress(40, text="🧠 AI가 맥락을 분석 중...") # 심리적 대기 시간 관리
+                            bar.progress(40, text="🧠 AI가 맥락을 분석 중...")
                             
-                            # AI 분석
                             res = analyze_news_with_ai(input_text)
                             
                             bar.progress(100, text="✨ 리포트 생성 완료!")
@@ -125,7 +130,6 @@ if news and len(news.entries) > 0:
                             st.markdown(f"### {res['title']}")
                             st.markdown(f"<div style='background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-style: italic; color: #4b5563; margin-bottom: 20px;'>“{res['summary']}”</div>", unsafe_allow_html=True)
                             
-                            # 2x2 그리드
                             st.markdown("<div class='fact-header'>ANALYSIS MATRIX</div>", unsafe_allow_html=True)
                             r1c1, r1c2 = st.columns(2)
                             with r1c1: st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO (주체)</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
@@ -135,7 +139,6 @@ if news and len(news.entries) > 0:
                             with r2c1: st.markdown(f"<div class='insight-card' style='margin-top:10px'><div class='fact-header'>KEY ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
                             with r2c2: st.markdown(f"<div class='insight-card' style='margin-top:10px'><div class='fact-header'>IMPACT / INSIGHT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
 
-                            # 팩트체크 (Logic 부활)
                             st.markdown("", unsafe_allow_html=True)
                             st.markdown("<div class='fact-header' style='margin-top: 20px;'>FACT CHECK & LOGIC</div>", unsafe_allow_html=True)
                             st.caption(f"💡 판단 근거: {res['fact_check']['logic']}")
@@ -146,7 +149,6 @@ if news and len(news.entries) > 0:
                             with t2:
                                 for c in res['fact_check']['controversial']: st.markdown(f"<span class='badge-ref'>CTX</span> {c}", unsafe_allow_html=True)
                             
-                            # 균형 & 에디터 노트 (Note 부활)
                             st.markdown("<div class='fact-header' style='margin-top: 20px;'>PERSPECTIVE</div>", unsafe_allow_html=True)
                             c1, c2 = st.columns(2)
                             with c1:
@@ -157,7 +159,7 @@ if news and len(news.entries) > 0:
                             st.info(f"🧐 **Editor's Insight:** {res['balance_sheet']['editor_note']}")
                             
                             end_time = time.time()
-                            st.caption(f"⏱️ 분석 소요 시간: {round(end_time - start_time, 2)}초 (심층 분석 모드)")
+                            st.caption(f"⏱️ 분석 소요 시간: {round(end_time - start_time, 2)}초")
 
                         except Exception as e:
                             st.error(f"Error: {e}")
