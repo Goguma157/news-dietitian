@@ -9,7 +9,7 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="News Dietitian", page_icon="⚖️", layout="wide")
 
-# CSS 스타일 (디자인 유지)
+# CSS 스타일 유지
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
@@ -22,23 +22,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# API 설정
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
-    st.error("API Key를 확인해주세요.")
+    st.error("Secrets에 API Key를 넣어주세요!")
 
-# 🔍 작동하는 모델을 찾는 함수
+# 작동 모델 찾기 로직
 def find_working_model():
     try:
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         for m in available:
             if '1.5' in m and 'flash' in m: return m
-        for m in available:
-            if 'flash' in m: return m
-        return available[0] if available else "gemini-pro"
+        return available[0] if available else "gemini-1.5-flash"
     except:
-        return "gemini-pro"
+        return "gemini-1.5-flash"
 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_news_data(url):
@@ -49,48 +46,44 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🧹 AI의 답변에서 JSON만 쏙 뽑아내는 세척기
-def clean_json_text(text):
-    # ```json ... ``` 태그가 붙어있으면 제거
-    text = re.sub(r'```json\s*|```\s*', '', text)
-    # 텍스트 앞뒤 공백 제거
-    return text.strip()
+# 🧼 [보강] AI 답변 청소기: 따옴표와 줄바꿈 문제를 강제로 해결
+def force_clean_json(text):
+    # 1. 마크다운 태그 제거
+    text = re.sub(r'```json\s*|```\s*', '', text).strip()
+    # 2. 제어 문자(줄바꿈 등) 제거
+    text = text.replace('\n', ' ').replace('\r', '')
+    return text
 
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     model_name = find_working_model()
     model = genai.GenerativeModel(model_name)
     
+    # 💡 AI에게 아주 엄격하게 명령 (줄바꿈 금지 등)
     prompt = f"""
-    당신은 뉴스 분석가입니다. 다음 뉴스를 분석해 JSON으로 출력하세요.
-    반드시 큰따옴표(")를 사용하고 제어 문자에 주의하세요.
+    당신은 전문 뉴스 분석가입니다. 아래 뉴스를 JSON으로 분석하세요.
+    중요: 모든 결과값에는 절대 줄바꿈(\n)을 넣지 말고 한 줄로 작성하세요. 
+    값 내부에 큰따옴표가 필요하면 작은따옴표로 대체하세요.
 
     [뉴스]: {news_text[:2000]}
 
-    [JSON 형식]:
-    {{
-        "title": "제목 (20자 내)",
-        "summary": "핵심 요약 (1문장)",
-        "metrics": {{ "who": "주체", "whom": "대상", "action": "행위", "impact": "파장" }},
-        "fact_check": {{ "verified": ["팩트1", "팩트2"], "controversial": ["논란"], "logic": "근거" }},
-        "balance": {{ "stated": "명분", "hidden": "의도", "note": "한 줄 평" }}
-    }}
+    [형식]:
+    {{"title":"제목","summary":"요약","metrics":{{"who":"주체","whom":"대상","action":"행위","impact":"파장"}},"fact_check":{{"verified":["팩트1"],"controversial":["논란"],"logic":"근거"}},"balance":{{"stated":"명분","hidden":"의도","note":"총평"}}}}
     """
     
     response = model.generate_content(
         prompt,
         generation_config=genai.types.GenerationConfig(
-            max_output_tokens=1000,
-            temperature=0.2, # ⚡ 더 안정적인 답변을 위해 온도를 낮춤
+            temperature=0.1, # 창의성을 최소화하여 에러 방지
             response_mime_type="application/json"
         )
     )
     
-    # 🧼 세척 후 로드
-    cleaned_text = clean_json_text(response.text)
-    return json.loads(cleaned_text)
+    # 🧼 한 번 더 닦아내고 읽기
+    cleaned = force_clean_json(response.text)
+    return json.loads(cleaned)
 
-# 화면 구성
+# --- 화면 구성 ---
 st.title("⚖️ NEWS DIETITIAN")
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
@@ -106,7 +99,7 @@ if news and len(news.entries) > 0:
                 st.markdown(f"**{entry.title}**")
                 
                 if st.button("✨ Deep Analysis", key=f"btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("AI가 통찰을 추출하는 중..."):
+                    with st.spinner("AI 분석 중..."):
                         try:
                             start_time = time.time()
                             input_text = f"제목: {entry.title}\n내용: {entry.description}"
@@ -134,9 +127,10 @@ if news and len(news.entries) > 0:
                                 st.warning(f"**이면:** {res['balance']['hidden']}")
                             
                             st.write(f"🧐 **Point:** {res['balance']['note']}")
-                            st.caption(f"⏱️ 분석 완료: {round(time.time() - start_time, 2)}초")
+                            st.caption(f"⏱️ {round(time.time() - start_time, 2)}s")
                             
-                        except Exception as e:
-                            st.error(f"데이터 파싱 중 오류가 발생했습니다. 다시 시도해주세요.")
+                        except Exception:
+                            # 🛡️ 최후의 보루: 에러가 나면 한 번 더 시도하게 유도
+                            st.error("데이터가 꼬였습니다. 버튼을 다시 한 번만 눌러주세요!")
                 
                 st.link_button("Read Original", entry.link, use_container_width=True)
