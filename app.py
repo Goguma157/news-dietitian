@@ -73,9 +73,9 @@ def analyze_news_with_ai(news_text):
     
     for attempt in range(max_retries):
         try:
-            # 💡 [핵심 변경] 모델 이름을 2.5(latest)에서 1.5로 고정!
-            # 이제 하루 1500번까지 무료이므로 429 에러가 안 납니다.
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # 💡 [핵심 변경] 아까 성공했던 'gemini-flash-latest'로 복귀!
+            # 사용자님 목록에 확실히 존재하고, 작동이 확인된 모델입니다.
+            model = genai.GenerativeModel('gemini-flash-latest')
             
             response = model.generate_content(
                 prompt, 
