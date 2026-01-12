@@ -36,7 +36,7 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🛡️ [최적화된 함수]
+# 🛡️ 최적화된 분석 함수
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
@@ -73,11 +73,13 @@ def analyze_news_with_ai(news_text):
     
     for attempt in range(max_retries):
         try:
-            model = genai.GenerativeModel('gemini-flash-latest')
+            # 💡 [핵심 변경] 모델 이름을 2.5(latest)에서 1.5로 고정!
+            # 이제 하루 1500번까지 무료이므로 429 에러가 안 납니다.
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
             response = model.generate_content(
                 prompt, 
                 generation_config=genai.types.GenerationConfig(
-                    # ⚡ [속도 최적화] 토큰을 1500으로 살짝 줄여서(충분함) 연산 시간을 아낌
                     max_output_tokens=1500,
                     temperature=0.3,
                     response_mime_type="application/json"
@@ -87,10 +89,8 @@ def analyze_news_with_ai(news_text):
             
         except Exception as e:
             last_error = str(e)
-            # ⚡ [변경점] time.sleep 제거 -> 에러 나자마자 0.001초만에 재시도
             continue
             
-    # 실패 시 반환값
     return {
         "title": "분석 일시 오류",
         "summary": "AI 연결 상태가 좋지 않아 분석 정보를 가져오지 못했습니다.",
