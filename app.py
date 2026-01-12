@@ -29,7 +29,7 @@ def analyze_news_with_ai(news_text):
         "fact_check": "이 기사에서 확인해야 할 핵심 숫자나 주장 1가지"
     }}
     """
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     response = model.generate_content(prompt)
     text = response.text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
