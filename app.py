@@ -29,9 +29,9 @@ def analyze_news_with_ai(news_text):
     }}
     """
     
-    # --- [여기가 수정되었습니다!] ---
-    # 사용자님 목록에 있는 최신형 모델 'gemini-2.0-flash'를 사용합니다.
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # --- [여기를 수정했습니다!] ---
+    # 아까 진단 목록에 확실히 있었던 'gemini-flash-latest' 사용
+    model = genai.GenerativeModel('gemini-flash-latest')
     
     response = model.generate_content(prompt)
     text = response.text.replace("```json", "").replace("```", "").strip()
@@ -39,7 +39,7 @@ def analyze_news_with_ai(news_text):
 
 # 4. 화면 구성
 st.title("🥦 뉴스 영양사: AI 에디션")
-st.write("버튼을 누르면 최신 AI(Gemini 2.0)가 뉴스를 분석해줍니다.")
+st.write("버튼을 누르면 AI가 뉴스를 분석해줍니다.")
 st.divider()
 
 # 뉴스 가져오기 (SBS 정치)
@@ -78,7 +78,7 @@ else:
                     if "GEMINI_API_KEY" not in st.secrets:
                          st.error("AI 키가 설정되지 않았습니다.")
                     else:
-                        with st.spinner("최신 Gemini 2.0이 분석 중입니다..."):
+                        with st.spinner("AI가 열심히 분석 중입니다..."):
                             try:
                                 input_text = f"제목: {entry.title}\n내용: {entry.description}"
                                 result = analyze_news_with_ai(input_text)
