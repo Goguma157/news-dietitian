@@ -27,7 +27,6 @@ try:
 except:
     pass 
 
-# RSS 캐싱
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_news_data(url):
     try:
@@ -37,14 +36,14 @@ def fetch_news_data(url):
     except:
         return None
 
-# AI 분석 캐싱
+# 🛡️ [최적화된 함수]
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
     당신은 '수석 정치 평론가'입니다. 제공된 뉴스를 분석하여 JSON으로 출력하세요.
     이면의 의도나 맥락을 날카롭게 짚어내되, 문장은 '개조식'으로 간결하게 작성하세요.
     
-    [뉴스]: {news_text[:2000]} 
+    [뉴스]: {news_text[:2500]} 
     
     [JSON 형식] (반드시 이 형식을 지키세요):
     {{
@@ -69,28 +68,36 @@ def analyze_news_with_ai(news_text):
     }}
     """
     
-    try:
-        model = genai.GenerativeModel('gemini-flash-latest')
-        response = model.generate_content(
-            prompt, 
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=1000,
-                temperature=0.3,
-                # 🛡️ [핵심 수정] 강제로 JSON 모드를 켜서 문법 오류를 원천 차단함
-                response_mime_type="application/json"
+    max_retries = 2
+    last_error = ""
+    
+    for attempt in range(max_retries):
+        try:
+            model = genai.GenerativeModel('gemini-flash-latest')
+            response = model.generate_content(
+                prompt, 
+                generation_config=genai.types.GenerationConfig(
+                    # ⚡ [속도 최적화] 토큰을 1500으로 살짝 줄여서(충분함) 연산 시간을 아낌
+                    max_output_tokens=1500,
+                    temperature=0.3,
+                    response_mime_type="application/json"
+                )
             )
-        )
-        return json.loads(response.text)
-        
-    except Exception as e:
-        # 🛡️ [안전장치] 만약 그래도 에러가 나면, 앱이 멈추지 않고 '실패 데이터'를 반환하게 함
-        return {
-            "title": "분석 일시 오류",
-            "summary": "AI가 응답을 생성하는 과정에서 문법 오류가 발생했습니다. 다시 시도해주세요.",
-            "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
-            "fact_check": {"verified": [], "controversial": [], "logic": "데이터 파싱 실패"},
-            "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {str(e)}"}
-        }
+            return json.loads(response.text)
+            
+        except Exception as e:
+            last_error = str(e)
+            # ⚡ [변경점] time.sleep 제거 -> 에러 나자마자 0.001초만에 재시도
+            continue
+            
+    # 실패 시 반환값
+    return {
+        "title": "분석 일시 오류",
+        "summary": "AI 연결 상태가 좋지 않아 분석 정보를 가져오지 못했습니다.",
+        "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
+        "fact_check": {"verified": [], "controversial": [], "logic": "데이터 파싱 실패"},
+        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {last_error}"}
+    }
 
 st.title("⚖️ News Dietitian (Pro)")
 st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Deep Insight, Fast Delivery</div>", unsafe_allow_html=True)
