@@ -31,7 +31,7 @@ def analyze_news_with_ai(news_text):
     
     # --- [여기가 수정되었습니다!] ---
     # 사용자님 목록에 있는 최신형 모델 'gemini-2.0-flash'를 사용합니다.
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     response = model.generate_content(prompt)
     text = response.text.replace("```json", "").replace("```", "").strip()
