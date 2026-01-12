@@ -8,7 +8,7 @@ import time
 # 1. 페이지 설정
 st.set_page_config(page_title="News Dietitian", page_icon="⚖️", layout="wide")
 
-# CSS 스타일
+# CSS 스타일 (전문적인 디자인)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
@@ -36,14 +36,14 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🛡️ [최종 병기] 모델 순차 접속 시스템
+# 🛡️ [심플 & 강력] 1.5 Flash 고정 버전
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
     prompt = f"""
     당신은 '수석 정치 평론가'입니다. 제공된 뉴스를 분석하여 JSON으로 출력하세요.
     이면의 의도나 맥락을 날카롭게 짚어내되, 문장은 '개조식'으로 간결하게 작성하세요.
     
-    [뉴스]: {news_text[:2000]} 
+    [뉴스]: {news_text[:2500]} 
     
     [JSON 형식] (반드시 이 형식을 지키세요):
     {{
@@ -68,47 +68,28 @@ def analyze_news_with_ai(news_text):
     }}
     """
     
-    # 📋 [후보 명단] 위에서부터 하나씩 시도합니다.
-    # 2.0, 2.5 같은 최신(실험) 모델은 다 빼고, 가장 안정적인 것들만 넣었습니다.
-    candidate_models = [
-        'gemini-1.5-flash',          # 1순위: 가장 빠름
-        'gemini-1.5-pro',            # 2순위: 성능 좋음
-        'gemini-pro',                # 3순위: 구형이지만 가장 안정적 (1.0 Pro)
-        'gemini-pro-latest',         # 4순위: 구형 최신
-        'models/gemini-1.5-flash-latest' # 5순위: 혹시 경로가 필요할까봐
-    ]
-    
-    last_error = ""
-    success_model = ""
-
-    for model_name in candidate_models:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(
-                prompt, 
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=1500,
-                    temperature=0.3,
-                    response_mime_type="application/json"
-                )
+    # 💡 새 키를 받으면 이 모델은 무조건 됩니다! (가성비 최고 모델)
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        response = model.generate_content(
+            prompt, 
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=1500,
+                temperature=0.3,
+                response_mime_type="application/json"
             )
-            # 성공하면 루프 탈출!
-            success_model = model_name
-            return json.loads(response.text)
-            
-        except Exception as e:
-            # 에러나면 다음 모델로 조용히 넘어감
-            last_error = str(e)
-            continue
-            
-    # 모든 후보가 다 실패했을 때만 에러 반환
-    return {
-        "title": "분석 실패",
-        "summary": f"모든 AI 모델 접속에 실패했습니다. (마지막 에러: {last_error[:50]}...)",
-        "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
-        "fact_check": {"verified": [], "controversial": [], "logic": "API Quota Exceeded"},
-        "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": "잠시 후 다시 시도해주세요."}
-    }
+        )
+        return json.loads(response.text)
+        
+    except Exception as e:
+        return {
+            "title": "분석 일시 오류",
+            "summary": "AI 연결에 실패했습니다. 키 설정을 확인해주세요.",
+            "metrics": {"who": "-", "whom": "-", "action": "-", "impact": "-"},
+            "fact_check": {"verified": [], "controversial": [], "logic": "API Error"},
+            "balance_sheet": {"side_a": "-", "side_b": "-", "editor_note": f"Error: {str(e)}"}
+        }
 
 st.title("⚖️ News Dietitian (Pro)")
 st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Deep Insight, Fast Delivery</div>", unsafe_allow_html=True)
@@ -135,9 +116,7 @@ if news and len(news.entries) > 0:
                             
                             input_text = f"{entry.title}\n{entry.description}"
                             time.sleep(0.1) 
-                            
-                            # 진행 상황 표시
-                            bar.progress(30, text="🤖 최적의 AI 모델 접속 시도 중...")
+                            bar.progress(40, text="🧠 AI가 맥락을 분석 중...")
                             
                             res = analyze_news_with_ai(input_text)
                             
