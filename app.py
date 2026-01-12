@@ -9,7 +9,7 @@ import time
 st.set_page_config(page_title="News Dietitian", page_icon="📰", layout="wide")
 
 # ==========================================
-# 🎨 CSS 스타일 (디자인 유지)
+# 🎨 CSS 스타일
 # ==========================================
 st.markdown("""
 <style>
@@ -74,16 +74,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. 비밀 금고 세팅
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
     pass 
 
 # ==========================================
-# ⚡ [속도 최적화 1] 뉴스 가져오기 캐싱
+# ⚡ [속도 최적화] 캐싱 적용
 # ==========================================
-# ttl=600 : 한 번 뉴스를 가져오면 600초(10분) 동안은 저장된 걸 보여줌 (매번 접속 안 함)
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_news_data(url):
     try:
@@ -96,37 +94,35 @@ def fetch_news_data(url):
     except:
         return None
 
-# ==========================================
-# ⚡ [속도 최적화 2] AI 분석 결과 캐싱
-# ==========================================
-# 같은 뉴스 내용(news_text)이라면, 다시 AI를 부르지 않고 저장된 결과를 즉시 리턴함
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
+    # ⚡ [속도 핵심] 프롬프트를 줄이고, 답변을 짧게 요구함
     prompt = f"""
-    당신은 냉철한 데이터 기반의 '수석 뉴스 분석가'입니다.
-    제공된 뉴스를 분석하여, 감정을 배제하고 구조화된 JSON 데이터로 출력하세요.
+    당신은 '수석 뉴스 분석가'입니다. 뉴스 핵심을 JSON으로 추출하세요.
+    최대한 간결하고 짧게(단답형 위주) 작성하여 응답 속도를 높이세요.
     
-    [뉴스 데이터]: {news_text}
+    [뉴스]: {news_text[:1500]} 
+    (내용이 길면 앞부분 1500자만 읽고 분석하세요)
     
-    [JSON 출력 형식]:
+    [JSON 형식]:
     {{
-        "title": "핵심을 찌르는 제목 (30자 내외)",
-        "summary": "전체 내용을 관통하는 1문장 요약 (Executive Summary)",
+        "title": "제목 (30자 내외)",
+        "summary": "1문장 요약",
         "metrics": {{
-            "who": "주체 (핵심 인물/기관)",
+            "who": "주체",
             "whom": "대상",
-            "action": "핵심 행위",
-            "impact": "영향/결과"
+            "action": "핵심 행위 (짧게)",
+            "impact": "결과 (짧게)"
         }},
         "fact_check": {{
-            "verified": ["확인된 팩트 1", "확인된 팩트 2"],
-            "controversial": ["논란/의혹/참고 1", "논란/의혹 2"],
-            "logic": "위와 같이 구분한 논리적 근거 (1문장)"
+            "verified": ["팩트 1", "팩트 2"],
+            "controversial": ["참고/배경 1"],
+            "logic": "구분 이유 (1문장)"
         }},
         "balance_sheet": {{
-            "side_a": "주요 발언/입장 (A측)",
-            "side_b": "반론/침묵/누락된 입장 (B측)",
-            "editor_note": "객관적 시각을 위한 제언"
+            "side_a": "A측 입장 (1문장)",
+            "side_b": "B측/누락된 입장 (1문장)",
+            "editor_note": "짧은 제언"
         }}
     }}
     """
@@ -135,13 +131,10 @@ def analyze_news_with_ai(news_text):
     text = response.text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
 
-# 3. 메인 UI 구성
 st.title("NEWS DIETITIAN")
 st.markdown("<div style='color: #6b7280; margin-top: -15px; margin-bottom: 30px; font-size: 18px;'>Objective News Analysis Dashboard</div>", unsafe_allow_html=True)
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
-
-# 캐싱된 함수 호출
 news = fetch_news_data(rss_url)
 
 if news is None or len(news.entries) == 0:
@@ -157,70 +150,30 @@ else:
                 st.markdown(f"<div style='font-size: 16px; font-weight: 700; line-height: 1.4; margin-bottom: 10px; height: 50px; overflow: hidden;'>{entry.title}</div>", unsafe_allow_html=True)
                 st.link_button("Read Original Article 🔗", entry.link, use_container_width=True)
                 
-                # 버튼을 누르면 분석 시작
                 if st.button("Deep Analysis ✨", key=f"btn_{i}", use_container_width=True, type="primary"):
                     if "GEMINI_API_KEY" not in st.secrets:
                          st.error("API Key Missing")
                     else:
-                        # 스피너는 UX를 위해 남겨둠
-                        with st.spinner("Processing Intelligence..."):
-                            try:
-                                input_text = f"제목: {entry.title}\n내용: {entry.description}"
-                                
-                                # 여기서 캐싱된 함수를 부름!
-                                # 만약 이전에 분석한 적 있는 기사라면 0.1초 만에 결과가 나옴
-                                res = analyze_news_with_ai(input_text)
-                                
-                                st.markdown("---")
-                                st.markdown(f"### {res['title']}")
-                                st.markdown(f"<div style='background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-style: italic; color: #4b5563; margin-bottom: 20px;'>“{res['summary']}”</div>", unsafe_allow_html=True)
-                                
-                                # 2x2 그리드 레이아웃
-                                st.markdown("<div class='fact-header'>KEY ENTITIES & IMPACT</div>", unsafe_allow_html=True)
-                                
-                                row1_col1, row1_col2 = st.columns(2)
-                                with row1_col1:
-                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
-                                with row1_col2:
-                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
-                                
-                                row2_col1, row2_col2 = st.columns(2)
-                                with row2_col1:
-                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
-                                with row2_col2:
-                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
+                        # ⚡ 진행바 UI 추가
+                        progress_text = "Reading News..."
+                        my_bar = st.progress(0, text=progress_text)
 
-                                st.markdown("<div class='fact-header' style='margin-top: 20px;'>FACT CHECK & CONTEXT</div>", unsafe_allow_html=True)
-                                st.caption(f"Logic: {res['fact_check']['logic']}")
-                                
-                                tab_a, tab_b = st.tabs(["VERIFIED FACTS", "CONTROVERSY / CONTEXT"])
-                                with tab_a:
-                                    for item in res['fact_check']['verified']:
-                                        st.markdown(f"<div style='margin-bottom: 8px;'><span class='badge-valid'>FACT</span> {item}</div>", unsafe_allow_html=True)
-                                with tab_b:
-                                    for item in res['fact_check']['controversial']:
-                                        st.markdown(f"<div style='margin-bottom: 8px;'><span class='badge-ref'>REF</span> {item}</div>", unsafe_allow_html=True)
+                        try:
+                            # 1. 데이터 준비 (30%)
+                            time.sleep(0.1)
+                            my_bar.progress(30, text="Extracting Facts...")
+                            
+                            input_text = f"제목: {entry.title}\n내용: {entry.description}"
+                            
+                            # 2. AI 분석 (캐싱됨)
+                            res = analyze_news_with_ai(input_text)
+                            
+                            # 3. 완료 (100%)
+                            my_bar.progress(100, text="Finalizing Design...")
+                            time.sleep(0.2)
+                            my_bar.empty() # 진행바 삭제
 
-                                st.markdown("<div class='fact-header' style='margin-top: 20px;'>VIEWPOINT BALANCE</div>", unsafe_allow_html=True)
-                                col_l, col_r = st.columns(2)
-                                with col_l:
-                                    st.markdown(f"""
-                                    <div style='border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px;'>
-                                        <strong style='color: #059669;'>📢 STATED</strong><br><br>{res['balance_sheet']['side_a']}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                with col_r:
-                                    st.markdown(f"""
-                                    <div style='border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #fef2f2;'>
-                                        <strong style='color: #dc2626;'>🔇 UNSTATED / MISSING</strong><br><br>{res['balance_sheet']['side_b']}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                
-                                st.markdown(f"""
-                                <div style='margin-top: 15px; font-size: 13px; color: #6b7280; text-align: right;'>
-                                    <strong>Editor's Note:</strong> {res['balance_sheet']['editor_note']}
-                                </div>
-                                """, unsafe_allow_html=True)
-
-                            except Exception as e:
-                                st.error(f"Analysis Failed: {e}")
+                            # --- 결과 화면 ---
+                            st.markdown("---")
+                            st.markdown(f"### {res['title']}")
+                            st.markdown(f"
