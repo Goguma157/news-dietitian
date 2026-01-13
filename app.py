@@ -33,7 +33,6 @@ except:
 def find_working_model():
     try:
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # 1.5-flash 모델을 우선적으로 찾습니다.
         for m in available:
             if '1.5' in m and 'flash' in m: return m.replace('models/', '')
         for m in available:
@@ -51,11 +50,24 @@ def fetch_news_data(url):
     except:
         return None
 
-# 🧼 AI 답변 청소기
-def force_clean_json(text):
-    text = re.sub(r'```json\s*|```\s*', '', text).strip()
-    text = text.replace('\n', ' ').replace('\r', '')
-    return text
+# 🧼 [강력 보정] AI 답변에서 JSON만 강제로 추출하고 다듬는 도구
+def safe_parse_json(raw_text):
+    try:
+        # 1. 마크다운 기호 제거
+        clean_text = re.sub(r'```json\s*|```\s*', '', raw_text).strip()
+        # 2. 줄바꿈을 공백으로 치환
+        clean_text = clean_text.replace('\n', ' ').replace('\r', '')
+        # 3. JSON 로드 시도
+        return json.loads(clean_text)
+    except:
+        # 4. 만약 실패하면 텍스트 내에서 { } 구간만 찾아내서 다시 시도
+        try:
+            match = re.search(r'\{.*\}', clean_text)
+            if match:
+                return json.loads(match.group())
+        except:
+            return None
+    return None
 
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
@@ -63,8 +75,8 @@ def analyze_news_with_ai(news_text):
     model = genai.GenerativeModel(model_name)
     
     prompt = f"""
-    당신은 전문 뉴스 분석가입니다. 아래 뉴스를 JSON으로 분석하세요.
-    모든 결과값에는 절대 줄바꿈을 넣지 말고 한 줄로 작성하세요.
+    당신은 뉴스 분석가입니다. 아래 뉴스를 JSON으로 분석하세요.
+    중요: 답변은 반드시 JSON 형식만 출력하세요. 설명이나 다른 말은 절대 금지입니다.
 
     [뉴스]: {news_text[:2000]}
 
@@ -75,13 +87,12 @@ def analyze_news_with_ai(news_text):
     response = model.generate_content(
         prompt,
         generation_config=genai.types.GenerationConfig(
-            temperature=0.1,
-            response_mime_type="application/json"
+            temperature=0.1, # 창의성을 낮춰서 문법 오류 방지
+            response_mime_type="application/json" # 구글 서버에 JSON 응답 강제 설정
         )
     )
     
-    cleaned = force_clean_json(response.text)
-    return json.loads(cleaned)
+    return safe_parse_json(response.text)
 
 # --- 화면 구성 ---
 st.title("⚖️ NEWS DIETITIAN")
@@ -99,39 +110,40 @@ if news and len(news.entries) > 0:
                 st.markdown(f"**{entry.title}**")
                 
                 if st.button("✨ Deep Analysis", key=f"btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("AI 분석 중..."):
+                    with st.spinner("분석 중..."):
                         try:
                             start_time = time.time()
                             input_text = f"제목: {entry.title}\n내용: {entry.description}"
                             res = analyze_news_with_ai(input_text)
                             
-                            st.markdown("---")
-                            st.markdown(f"#### {res['title']}")
-                            st.info(res['summary'])
-                            
-                            m1, m2 = st.columns(2)
-                            with m1:
-                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
-                                st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
-                            with m2:
-                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
-                                st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
+                            if res:
+                                st.markdown("---")
+                                st.markdown(f"#### {res['title']}")
+                                st.info(res['summary'])
+                                
+                                m1, m2 = st.columns(2)
+                                with m1:
+                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>ACTION</div><div class='fact-content'>{res['metrics']['action']}</div></div>", unsafe_allow_html=True)
+                                with m2:
+                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>WHOM</div><div class='fact-content'>{res['metrics']['whom']}</div></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
 
-                            t1, t2 = st.tabs(["✅ Fact", "⚖️ Balance"])
-                            with t1:
-                                for f in res['fact_check']['verified']:
-                                    st.markdown(f"<span class='badge-valid'>팩트</span> {f}", unsafe_allow_html=True)
-                                st.caption(f"근거: {res['fact_check']['logic']}")
-                            with t2:
-                                st.success(f"**명분:** {res['balance']['stated']}")
-                                st.warning(f"**이면:** {res['balance']['hidden']}")
+                                t1, t2 = st.tabs(["✅ Fact", "⚖️ Balance"])
+                                with t1:
+                                    for f in res['fact_check']['verified']:
+                                        st.markdown(f"<span class='badge-valid'>팩트</span> {f}", unsafe_allow_html=True)
+                                    st.caption(f"근거: {res['fact_check']['logic']}")
+                                with t2:
+                                    st.success(f"**명분:** {res['balance']['stated']}")
+                                    st.warning(f"**이면:** {res['balance']['hidden']}")
+                                
+                                st.write(f"🧐 **Point:** {res['balance']['note']}")
+                                st.caption(f"🤖 모델: {find_working_model()} | ⏱️ {round(time.time() - start_time, 2)}s")
+                            else:
+                                st.error("AI 응답 형식이 불안정합니다. 잠시 후 다시 시도해주세요.")
                             
-                            st.write(f"🧐 **Point:** {res['balance']['note']}")
-                            
-                            # 🏁 [마지막 줄 추가] 현재 사용 중인 모델과 분석 시간 표시
-                            st.caption(f"🤖 사용 모델: {find_working_model()} | ⏱️ 분석 시간: {round(time.time() - start_time, 2)}s")
-                            
-                        except Exception:
-                            st.error("데이터 파싱 실패. 다시 눌러주세요!")
+                        except Exception as e:
+                            st.error(f"예상치 못한 오류: {e}")
                 
                 st.link_button("Read Original", entry.link, use_container_width=True)
