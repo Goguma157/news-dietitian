@@ -12,7 +12,6 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Pretendard', sans-serif !important; color: #1a1a1a; }
-    div[data-testid="stContainer"] { background-color: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; }
     .insight-card { background-color: #f8f9fa; padding: 18px; border-radius: 10px; border-left: 4px solid #0f172a; margin-bottom: 12px; height: 100%; }
 </style>
 """, unsafe_allow_html=True)
@@ -27,15 +26,25 @@ def safe_parse_json(raw_text):
         return None
 
 # ==========================================
-# 🧠 AI 분석 (라이브러리 없이 직접 통신)
+# 🧠 AI 분석 (무차별 대입 접속)
 # ==========================================
 @st.cache_data(show_spinner=False)
-def analyze_news_direct(news_text):
+def analyze_news_brute_force(news_text):
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # 🚨 [핵심] 라이브러리 대신 직접 URL로 접속합니다. 
-    # v1beta 버전을 사용하되, 모델명은 확실한 1.5-flash를 씁니다.
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # 🚨 [전략] 별명이 안 되면 본명으로, 본명이 안 되면 옛날 이름으로 다 찔러봅니다.
+    candidate_urls = [
+        # 1. 가장 최신 (002) - 주민등록번호
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key={api_key}",
+        # 2. 구형 안정화 (001) - 주민등록번호
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key={api_key}",
+        # 3. 최신 별명 (latest)
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}",
+        # 4. 기본 별명 (여기서 404가 났었음)
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+        # 5. 정 안되면 Pro 버전이라도
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}",
+    ]
     
     headers = {'Content-Type': 'application/json'}
     
@@ -50,33 +59,37 @@ def analyze_news_direct(news_text):
     """
     
     data = {
-        "contents": [{
-            "parts": [{"text": prompt_text}]
-        }],
-        "generationConfig": {
-            "temperature": 0.3,
-            "responseMimeType": "application/json"
-        }
+        "contents": [{"parts": [{"text": prompt_text}]}],
+        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"}
     }
 
-    try:
-        # requests로 직접 쏘기 때문에 라이브러리 버전 문제에서 자유롭습니다.
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        
-        if response.status_code == 200:
-            result = response.json()
-            # 구글이 주는 쌩 데이터에서 텍스트만 발라내기
-            text_content = result['candidates'][0]['content']['parts'][0]['text']
-            return safe_parse_json(text_content), "Direct REST API"
-        else:
-            return None, f"HTTP Error {response.status_code}: {response.text}"
+    last_error = ""
+    
+    # 🔁 반복문으로 뚫릴 때까지 시도
+    for url in candidate_urls:
+        try:
+            # 모델 이름만 추출 (디버깅용)
+            model_name = url.split("models/")[1].split(":")[0]
             
-    except Exception as e:
-        return None, f"통신 오류: {str(e)}"
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                text_content = result['candidates'][0]['content']['parts'][0]['text']
+                return safe_parse_json(text_content), f"성공! ({model_name})"
+            else:
+                last_error = f"{model_name} -> {response.status_code}"
+                continue # 실패하면 다음 URL로 넘어감
+                
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return None, f"모든 경로 실패. 마지막 에러: {last_error}"
 
 # --- 화면 구성 ---
 st.title("⚖️ NEWS DIETITIAN")
-st.caption("라이브러리 없이 구글 서버와 직접 통신합니다.")
+st.caption("가능한 모든 모델 주소를 순차적으로 시도합니다.")
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
 try:
@@ -92,15 +105,15 @@ if news and news.entries:
             with st.container(border=True):
                 st.markdown(f"**{entry.title}**")
                 
-                if st.button("✨ 분석", key=f"rest_btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("구글 본사로 직접 연결 중..."):
-                        res, method = analyze_news_direct(entry.description)
+                if st.button("✨ 분석", key=f"nuke_btn_{i}", use_container_width=True, type="primary"):
+                    with st.spinner("접속 가능한 모델을 찾는 중..."):
+                        res, msg = analyze_news_brute_force(entry.description)
                         if res:
                             st.markdown("---")
                             st.markdown(f"#### {res['title']}")
                             st.info(res['summary'])
-                            st.caption(f"✅ 연결 방식: {method}")
+                            st.caption(f"✅ {msg}")
                         else:
-                            st.error(f"실패: {method}")
+                            st.error(f"❌ {msg}")
                 
                 st.link_button("원문", entry.link, use_container_width=True)
