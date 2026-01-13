@@ -17,15 +17,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. API 설정 (오류 방지)
+# 2. API 설정
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    # 공백 제거 등 안전장치
     genai.configure(api_key=api_key.strip())
 except:
-    st.error("Secrets에 API Key를 확인해주세요!")
+    st.error("Secrets 확인 필요")
 
-# 🧼 JSON 보정 함수
+# 🧼 JSON 세탁기
 def safe_parse_json(raw_text):
     try:
         clean_text = re.sub(r'```json\s*|```\s*', '', raw_text).strip()
@@ -35,38 +34,20 @@ def safe_parse_json(raw_text):
         return None
 
 # ==========================================
-# 🔍 1. 확실한 모델 이름 찾기 (여기가 핵심!)
-# ==========================================
-def get_verified_model_name():
-    try:
-        # 내 키로 조회되는 모든 모델을 가져옴
-        all_models = genai.list_models()
-        
-        # 1순위: '1.5'와 'flash'가 들어간 모델 찾기
-        for m in all_models:
-            if 'generateContent' in m.supported_generation_methods:
-                if '1.5' in m.name and 'flash' in m.name:
-                    return m.name # (예: models/gemini-1.5-flash-001)
-        
-        # 2순위: 없으면 그냥 'flash' 들어간 거 아무거나
-        for m in all_models:
-            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
-                return m.name
-                
-        return "models/gemini-1.5-flash" # 비상용 기본값
-    except Exception as e:
-        # 목록 조회 실패 시 기본값 리턴
-        return "models/gemini-1.5-flash"
-
-# ==========================================
-# 🧠 2. 찾은 모델로 분석하기
+# 🧠 AI 분석 (이름표 떼고 알맹이만 던지기)
 # ==========================================
 @st.cache_data(show_spinner=False)
-def analyze_news_final(news_text):
-    # 1단계에서 찾은 '확실한 이름'을 가져옵니다.
-    target_name = get_verified_model_name()
+def analyze_news_stripped(news_text):
     
-    model = genai.GenerativeModel(target_name)
+    # 🚨 [전략 수정] 'models/' 접두사를 절대 붙이지 않습니다.
+    # 구글 서버가 버전에 따라 접두사를 싫어하는 경우가 있습니다.
+    candidates = [
+        "gemini-1.5-flash",          # 1순위: 가장 깔끔한 이름
+        "gemini-1.5-flash-latest",   # 2순위: 최신 별명
+        "gemini-1.5-flash-001",      # 3순위: 구형 고정 버전
+        "gemini-1.5-flash-002",      # 4순위: 신형 고정 버전
+        "gemini-pro"                 # 5순위: 최후의 보루 (1.0)
+    ]
     
     prompt = f"""
     당신은 친절한 뉴스 선생님입니다. 초보자도 이해할 수 있게 비유와 예시를 들어 설명하세요.
@@ -77,22 +58,34 @@ def analyze_news_final(news_text):
     [형식]:
     {{"title":"제목","summary":"비유 요약","metrics":{{"who":"주체","whom":"대상","action":"행위","impact":"파장"}},"fact_check":{{"verified":["팩트"],"logic":"근거"}},"balance":{{"stated":"명분","hidden":"속마음","note":"팁"}}}}
     """
+
+    last_error = ""
     
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.3,
-                response_mime_type="application/json"
+    # 후보군을 순서대로 대입
+    for name in candidates:
+        try:
+            # 여기서 name은 'models/'가 없는 순수 이름입니다.
+            model = genai.GenerativeModel(name)
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.3,
+                    response_mime_type="application/json"
+                )
             )
-        )
-        return safe_parse_json(response.text), target_name
-    except Exception as e:
-        return None, str(e)
+            # 성공하면 바로 리턴
+            return safe_parse_json(response.text), name
+            
+        except Exception as e:
+            last_error = str(e)
+            continue # 실패하면 다음 후보로
+
+    return None, f"모든 모델 실패. (마지막 에러: {last_error})"
 
 # --- 화면 구성 ---
 st.title("⚖️ NEWS DIETITIAN")
-st.caption("API 연결 성공! 목록에서 확인된 모델을 사용합니다.")
+st.caption("접두사 없는 순수 모델명으로 접속을 시도합니다.")
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
 try:
@@ -108,21 +101,16 @@ if news and news.entries:
             with st.container(border=True):
                 st.markdown(f"**{entry.title}**")
                 
-                if st.button("✨ 분석 시작", key=f"real_final_btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("AI 연결 중..."):
-                        res, model_used = analyze_news_final(entry.description)
+                if st.button("✨ 분석 시작", key=f"strip_btn_{i}", use_container_width=True, type="primary"):
+                    with st.spinner("알맹이 이름으로 접속 시도..."):
+                        res, used_name = analyze_news_stripped(entry.description)
                         
                         if res:
                             st.markdown("---")
                             st.markdown(f"#### {res['title']}")
                             st.info(res['summary'])
-                            
-                            m1, m2 = st.columns(2)
-                            with m1: st.markdown(f"<div class='insight-card'><b>WHO:</b> {res['metrics']['who']}</div>", unsafe_allow_html=True)
-                            with m2: st.markdown(f"<div class='insight-card'><b>IMPACT:</b> {res['metrics']['impact']}</div>", unsafe_allow_html=True)
-                            
-                            st.caption(f"✅ 사용된 모델: {model_used}")
+                            st.caption(f"✅ 접속 성공: {used_name}")
                         else:
-                            st.error(f"분석 실패: {model_used}")
+                            st.error(f"❌ 실패: {used_name}")
                 
-                st.link_button("원문 보기", entry.link, use_container_width=True)
+                st.link_button("원문", entry.link, use_container_width=True)
