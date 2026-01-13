@@ -24,15 +24,16 @@ st.markdown("""
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
-    st.error("Secrets에서 API Key를 확인해주세요!")
+    st.error("Secrets에서 API 키를 확인해 주세요.")
 
-# 🔍 [수정] 내 계정에서 실제로 쓸 수 있는 1.5-flash의 정확한 '이름표'를 찾는 함수
-def get_real_model_name():
+# 🔍 [핵심] 내 계정에서 실제로 쓸 수 있는 모델의 정확한 풀네임을 찾는 함수
+def get_exact_model_name():
     try:
+        # 사용 가능한 모든 모델을 가져옵니다.
         for m in genai.list_models():
-            # 이름에 1.5와 flash가 들어있고, 분석 기능이 있는 모델을 찾습니다.
+            # 이름에 '1.5'와 'flash'가 들어있는 녀석을 찾습니다.
             if '1.5' in m.name and 'flash' in m.name and 'generateContent' in m.supported_generation_methods:
-                return m.name # 예: 'models/gemini-1.5-flash' 또는 'models/gemini-1.5-flash-latest'
+                return m.name  # 예: 'models/gemini-1.5-flash' 또는 'models/gemini-1.5-flash-latest'
         return "models/gemini-1.5-flash" # 정 못 찾으면 기본값
     except:
         return "models/gemini-1.5-flash"
@@ -47,15 +48,24 @@ def safe_parse_json(raw_text):
         return None
 
 # ==========================================
-# 🧠 AI 분석 (이름 찾기 로직 적용)
+# 🧠 AI 분석 (자동 조준 로직 적용)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_with_ai(news_text):
-    # 실시간으로 내 계정에 맞는 모델 이름을 가져옵니다.
-    working_name = get_real_model_name()
+    # 실시간으로 사용자님 계정에 맞는 정확한 이름을 가져옵니다.
+    working_name = get_exact_model_name()
     model = genai.GenerativeModel(working_name)
     
-    prompt = f"초보자도 알기 쉽게 비유를 들어 이 뉴스를 JSON으로 분석해줘: {news_text[:1500]}"
+    # 초심자 배려 프롬프트
+    prompt = f"""
+    당신은 친절한 뉴스 해설가입니다. 지식이 부족한 사람도 이해할 수 있게 비유와 예시를 들어 분석하세요.
+    모든 답변은 반드시 JSON 형식으로만 출력하세요.
+
+    [뉴스]: {news_text[:1500]}
+
+    [형식]:
+    {{"title":"제목","summary":"비유 섞인 요약","metrics":{{"who":"주체","whom":"대상","action":"행위","impact":"파장"}},"fact_check":{{"verified":["팩트"],"logic":"분석 근거"}},"balance":{{"stated":"명분","hidden":"속마음","note":"관전포인트"}}}}
+    """
     
     try:
         response = model.generate_content(
@@ -73,23 +83,36 @@ def analyze_news_with_ai(news_text):
 st.title("⚖️ NEWS DIETITIAN")
 
 rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
-resp = requests.get(rss_url)
-news = feedparser.parse(resp.content)
+try:
+    resp = requests.get(rss_url, timeout=10)
+    news = feedparser.parse(resp.content)
+except:
+    st.error("뉴스를 가져오지 못했습니다.")
+    news = None
 
-if news.entries:
+if news and news.entries:
     cols = st.columns(3)
     for i, entry in enumerate(news.entries[:12]):
         with cols[i % 3]:
             with st.container(border=True):
                 st.markdown(f"**{entry.title}**")
                 
-                # 버튼을 누를 때마다 새로 분석하도록 키 값을 조정
-                if st.button("✨ 쉬운 분석", key=f"re_btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("AI가 정확한 모델 주소를 찾는 중..."):
+                if st.button("✨ 쉬운 분석", key=f"final_btn_{i}", use_container_width=True, type="primary"):
+                    with st.spinner("가장 정확한 모델 주소를 찾는 중..."):
                         res, model_info = analyze_news_with_ai(entry.description)
                         if res:
-                            st.info(res.get('summary', '요약 준비 중...'))
-                            st.caption(f"🤖 연결 성공: {model_info}")
+                            st.markdown("---")
+                            st.markdown(f"#### {res['title']}")
+                            st.info(res['summary'])
+                            
+                            m1, m2 = st.columns(2)
+                            with m1:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
+                            with m2:
+                                st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
+                            
+                            st.caption(f"🤖 연결 성공: {model_info} | ⏱️ {round(time.time(), 2)}")
                         else:
-                            st.error(f"오류 발생: {model_info}")
+                            st.error(f"오류: {model_info}")
+                
                 st.link_button("원문 보기", entry.link, use_container_width=True)
