@@ -1,119 +1,65 @@
 import streamlit as st
-import feedparser
-import json
-import requests
+import google.generativeai as genai
 import time
-import re
 
-# 1. 페이지 설정
-st.set_page_config(page_title="News Dietitian", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="최후의 모델 찾기", page_icon="🕵️")
 
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Pretendard', sans-serif !important; color: #1a1a1a; }
-    .insight-card { background-color: #f8f9fa; padding: 18px; border-radius: 10px; border-left: 4px solid #0f172a; margin-bottom: 12px; height: 100%; }
-</style>
-""", unsafe_allow_html=True)
+st.title("🕵️ 범인(작동하는 모델) 색출 작전")
 
-# 🧼 JSON 정리 함수
-def safe_parse_json(raw_text):
-    try:
-        clean_text = re.sub(r'```json\s*|```\s*', '', raw_text).strip()
-        clean_text = clean_text.replace('\n', ' ').replace('\r', '')
-        return json.loads(clean_text)
-    except:
-        return None
-
-# ==========================================
-# 🧠 AI 분석 (무차별 대입 접속)
-# ==========================================
-@st.cache_data(show_spinner=False)
-def analyze_news_brute_force(news_text):
-    api_key = st.secrets["GEMINI_API_KEY"]
-    
-    # 🚨 [전략] 별명이 안 되면 본명으로, 본명이 안 되면 옛날 이름으로 다 찔러봅니다.
-    candidate_urls = [
-        # 1. 가장 최신 (002) - 주민등록번호
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key={api_key}",
-        # 2. 구형 안정화 (001) - 주민등록번호
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key={api_key}",
-        # 3. 최신 별명 (latest)
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}",
-        # 4. 기본 별명 (여기서 404가 났었음)
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
-        # 5. 정 안되면 Pro 버전이라도
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}",
-    ]
-    
-    headers = {'Content-Type': 'application/json'}
-    
-    prompt_text = f"""
-    당신은 친절한 뉴스 선생님입니다. 지식이 없는 초보자도 이해할 수 있게 '쉬운 비유'와 '예시'를 들어 설명하세요.
-    답변은 반드시 JSON 형식으로만 출력하세요.
-
-    [뉴스]: {news_text[:1500]}
-
-    [형식]:
-    {{"title":"제목","summary":"비유 요약","metrics":{{"who":"주체","whom":"대상","action":"행위","impact":"파장"}},"fact_check":{{"verified":["팩트"],"logic":"근거"}},"balance":{{"stated":"명분","hidden":"속마음","note":"팁"}}}}
-    """
-    
-    data = {
-        "contents": [{"parts": [{"text": prompt_text}]}],
-        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"}
-    }
-
-    last_error = ""
-    
-    # 🔁 반복문으로 뚫릴 때까지 시도
-    for url in candidate_urls:
-        try:
-            # 모델 이름만 추출 (디버깅용)
-            model_name = url.split("models/")[1].split(":")[0]
-            
-            response = requests.post(url, headers=headers, json=data, timeout=10)
-            
-            if response.status_code == 200:
-                result = response.json()
-                text_content = result['candidates'][0]['content']['parts'][0]['text']
-                return safe_parse_json(text_content), f"성공! ({model_name})"
-            else:
-                last_error = f"{model_name} -> {response.status_code}"
-                continue # 실패하면 다음 URL로 넘어감
-                
-        except Exception as e:
-            last_error = str(e)
-            continue
-
-    return None, f"모든 경로 실패. 마지막 에러: {last_error}"
-
-# --- 화면 구성 ---
-st.title("⚖️ NEWS DIETITIAN")
-st.caption("가능한 모든 모델 주소를 순차적으로 시도합니다.")
-
-rss_url = "http://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER"
+# 1. API 키 가져오기
 try:
-    resp = requests.get(rss_url, timeout=10)
-    news = feedparser.parse(resp.content)
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+    st.success(f"🔑 키 인식됨: {api_key[:5]}... (Secrets 설정 확인 완료)")
 except:
-    news = None
+    st.error("Secrets에 API Key가 없습니다!")
+    st.stop()
 
-if news and news.entries:
-    cols = st.columns(3)
-    for i, entry in enumerate(news.entries[:12]):
-        with cols[i % 3]:
-            with st.container(border=True):
-                st.markdown(f"**{entry.title}**")
-                
-                if st.button("✨ 분석", key=f"nuke_btn_{i}", use_container_width=True, type="primary"):
-                    with st.spinner("접속 가능한 모델을 찾는 중..."):
-                        res, msg = analyze_news_brute_force(entry.description)
-                        if res:
-                            st.markdown("---")
-                            st.markdown(f"#### {res['title']}")
-                            st.info(res['summary'])
-                            st.caption(f"✅ {msg}")
-                        else:
-                            st.error(f"❌ {msg}")
-                
-                st.link_button("원문", entry.link, use_container_width=True)
+# 2. 전수조사 시작
+if st.button("🚀 작동하는 모델 찾기 시작", type="primary"):
+    log_area = st.empty()
+    logs = []
+    
+    try:
+        # 모델 목록 조회
+        models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        logs.append(f"📋 조회된 모델 수: {len(models)}개")
+        
+        found_working_model = False
+        
+        for m in models:
+            model_name = m.name
+            display_name = m.displayName
+            
+            with st.spinner(f"테스트 중: {display_name} ({model_name})..."):
+                try:
+                    # 테스트 전송
+                    model = genai.GenerativeModel(model_name)
+                    response = model.generate_content("Hello")
+                    
+                    if response.text:
+                        st.balloons()
+                        st.markdown("### 🎉 찾았다! 작동하는 모델!")
+                        st.success(f"✅ 모델명: `{model_name}`")
+                        st.json({
+                            "display_name": display_name,
+                            "full_name": model_name,
+                            "test_response": response.text
+                        })
+                        st.info("👇 아래 코드를 복사해서 사용하세요!")
+                        st.code(f'model = genai.GenerativeModel("{model_name}")', language='python')
+                        found_working_model = True
+                        break # 성공하면 바로 중단
+                        
+                except Exception as e:
+                    logs.append(f"❌ 실패 ({model_name}): {str(e)[:50]}...")
+                    log_area.text("\n".join(logs))
+                    time.sleep(0.5) # 너무 빠르면 차단되니 살짝 대기
+        
+        if not found_working_model:
+            st.error("💀 모든 모델 테스트 실패. API 설정(Enable) 문제일 가능성이 큽니다.")
+            st.write("상세 에러 로그:")
+            st.code("\n".join(logs))
+
+    except Exception as e:
+        st.error(f"목록 조회조차 실패했습니다. API 키가 잘못되었거나 프로젝트 권한 문제입니다.\n에러: {e}")
