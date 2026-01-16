@@ -7,14 +7,13 @@ import time
 import re
 
 # 1. 페이지 설정
-st.set_page_config(page_title="News Dietitian : Fact Checker", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="News Dietitian : Global", page_icon="🌎", layout="wide")
 
 # ==========================================
-# 🎨 AllSides 스타일: 전문적이고 신뢰감 있는 CSS
+# 🎨 UI 스타일 (AllSides 전문적 디자인 유지)
 # ==========================================
 st.markdown("""
 <style>
-    /* 폰트: 제목은 권위 있는 Serif(명조), 본문은 깔끔한 Sans-serif(고딕) */
     @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Roboto:wght@300;400;500;700&display=swap');
     
     html, body, [class*="css"] { 
@@ -23,60 +22,22 @@ st.markdown("""
         background-color: #fcfcfc;
     }
     
-    h1, h2, h3 {
-        font-family: 'Merriweather', serif !important;
-        font-weight: 900;
-        color: #2c3e50;
-    }
+    h1, h2, h3 { font-family: 'Merriweather', serif !important; font-weight: 900; color: #2c3e50; }
 
-    /* 사이드바 스타일 (신문 1면 사이드바 느낌) */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e0e0e0;
-    }
-
-    /* 뉴스 카드 컨테이너 (각진 모서리, 미니멀한 그림자) */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
-        border-radius: 4px; /* 둥근 느낌 제거 */
+        border-radius: 4px;
         padding: 24px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        transition: all 0.2s;
         margin-bottom: 16px;
     }
     
-    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        border-color: #b0b0b0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.08);
-    }
-
-    /* 버튼 스타일 (언론사 구독 버튼 느낌) */
-    .stButton > button {
-        background-color: #ffffff;
-        color: #2c3e50;
-        border: 1px solid #2c3e50;
-        border-radius: 2px;
-        font-weight: 600;
-        font-family: 'Roboto', sans-serif;
-        text-transform: uppercase;
-        font-size: 12px;
-        padding: 0.4rem 1rem;
-        transition: all 0.2s;
-    }
-    .stButton > button:hover {
-        background-color: #2c3e50;
-        color: #ffffff;
-        border-color: #2c3e50;
-    }
-
-    /* 커스텀 배지 스타일 */
-    .badge-fact { background-color: #27ae60; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
-    .badge-mixed { background-color: #f39c12; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
-    .badge-opinion { background-color: #c0392b; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
+    .badge-fact { background-color: #27ae60; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
+    .badge-mixed { background-color: #f39c12; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
+    .badge-opinion { background-color: #c0392b; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
     .badge-source { background-color: #ecf0f1; color: #7f8c8d; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; border-radius: 2px; margin-right: 6px; }
 
-    /* 분석 결과 박스 (신문 사설 느낌) */
     .insight-box {
         background-color: #f9f9f9;
         border-left: 4px solid #34495e;
@@ -87,11 +48,9 @@ st.markdown("""
         color: #2c3e50;
         margin-top: 15px;
     }
-
-    /* 채팅 스타일 */
+    
     .chat-user { text-align: right; margin: 8px 0; color: #555; font-size: 13px; font-style: italic; }
     .chat-ai { text-align: left; margin: 8px 0; font-weight: 600; color: #2c3e50; font-size: 13px; }
-    
 </style>
 """, unsafe_allow_html=True)
 
@@ -119,31 +78,40 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 🧠 AI 분석
+# 🧠 AI 분석 (한국어/영어 자동 대응)
 # ==========================================
 @st.cache_data(show_spinner=False)
-def analyze_news_groq(news_text):
-    # AllSides 스타일의 전문적인 분석 요청
-    system_prompt = "You are a professional news analyst like AllSides. Analyze the bias, factuality, and context strictly. Output JSON."
+def analyze_news_groq(news_text, region_code):
+    # 🚨 핵심: 미국 뉴스(US)를 선택해도 출력은 '한국어(Korean)'로 나오게 지시합니다.
+    # 이것이 진정한 '뉴스 다이어트(소화)' 기능입니다.
+    
+    language_instruction = "Translate the analysis into Korean perfectly." if region_code == "US" else "Answer in Korean."
+    
+    system_prompt = f"""
+    You are a professional news analyst like AllSides. 
+    Analyze the bias, factuality, and context strictly. 
+    {language_instruction}
+    Output JSON format ONLY.
+    """
     
     user_prompt = f"""
     [Article]: {news_text[:2500]}
     
     [Output Format (JSON Only)]:
     {{
-        "title": "Unbiased Headline",
-        "summary": "Neutral summary (1-2 sentences)",
+        "title": "Unbiased Headline (Translate to Korean)",
+        "summary": "Neutral summary (1-2 sentences in Korean)",
         "metrics": {{
-            "who": "Key Actor",
-            "impact": "Core Impact"
+            "who": "Key Actor (in Korean)",
+            "impact": "Core Impact (in Korean)"
         }},
         "scores": {{
             "fact_ratio": Number (0-100),
             "opinion_ratio": Number (0-100)
         }},
         "balance": {{
-            "stated": "Explicit Claim",
-            "hidden": "Implicit Bias/Context",
+            "stated": "Explicit Claim (in Korean)",
+            "hidden": "Implicit Bias/Context (in Korean)",
             "rating": "FACT" or "MIXED" or "OPINION"
         }}
     }}
@@ -156,7 +124,7 @@ def analyze_news_groq(news_text):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1, # 사실 기반 분석을 위해 온도를 낮춤
+            temperature=0.1,
             response_format={"type": "json_object"}
         )
         return safe_parse_json(completion.choices[0].message.content)
@@ -168,43 +136,61 @@ def ask_ai_about_news(news_context, user_question):
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a neutral news assistant."},
+                {"role": "system", "content": "You are a neutral news assistant. Answer in Korean."},
                 {"role": "user", "content": f"Context: {news_context}\n\nQuestion: {user_question}"}
             ],
             temperature=0.5
         )
         return completion.choices[0].message.content
     except:
-        return "Analysis unavailable."
+        return "죄송합니다. 답변을 생성할 수 없습니다."
 
 # --- 화면 구성 ---
 
 st.sidebar.markdown("<h2 style='text-align: center; color: #2c3e50;'>NEWS<br>DIETITIAN</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
-st.sidebar.caption("CURATED FEEDS")
 
-category = st.sidebar.radio(
-    "TOPICS",
-    ("HEADLINES", "POLITICS", "BUSINESS", "WORLD", "TECH")
+# 🌍 [1] 국가/지역 선택 기능 추가
+region = st.sidebar.selectbox(
+    "REGION / EDITION",
+    ("🇰🇷 Korea (KR)", "🇺🇸 USA (US)"),
+    index=1 # 기본값을 미국으로 설정해볼까요? (원하시면 0으로 변경)
 )
 
-rss_feeds = {
-    "HEADLINES": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
-    "POLITICS": "https://news.google.com/rss/headlines/section/topic/POLITICS?hl=ko&gl=KR&ceid=KR:ko",
-    "BUSINESS": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko",
-    "WORLD": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ko&gl=KR&ceid=KR:ko",
-    "TECH": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ko&gl=KR&ceid=KR:ko"
-}
+st.sidebar.caption("CURATED FEEDS")
 
-# 메인 헤더 (신문 타이틀 느낌)
-st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category}</h1>", unsafe_allow_html=True)
+# 🌍 [2] 국가별 카테고리 & RSS 주소 매핑
+if "Korea" in region:
+    region_code = "KR"
+    rss_categories = {
+        "HEADLINES": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
+        "POLITICS": "https://news.google.com/rss/headlines/section/topic/POLITICS?hl=ko&gl=KR&ceid=KR:ko",
+        "BUSINESS": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko",
+        "WORLD": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ko&gl=KR&ceid=KR:ko",
+        "TECH": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ko&gl=KR&ceid=KR:ko"
+    }
+else:
+    region_code = "US"
+    # 🚨 구글 뉴스 '미국판(US Edition)' RSS 주소
+    rss_categories = {
+        "HEADLINES": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
+        "POLITICS": "https://news.google.com/rss/headlines/section/topic/POLITICS?hl=en-US&gl=US&ceid=US:en",
+        "BUSINESS": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en",
+        "WORLD": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en",
+        "TECH": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en"
+    }
+
+category = st.sidebar.radio("TOPICS", list(rss_categories.keys()))
+
+# 메인 헤더
+st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category} <span style='font-size:18px; color:#666;'>({region_code})</span></h1>", unsafe_allow_html=True)
 
 try:
     headers = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(rss_feeds.get(category), headers=headers, timeout=5)
+    resp = requests.get(rss_categories.get(category), headers=headers, timeout=5)
     news = feedparser.parse(resp.content)
 except:
-    st.error("Feed Unavailable")
+    st.error("News Feed Unavailable")
     news = None
 
 if news and news.entries:
@@ -213,7 +199,7 @@ if news and news.entries:
     for i, entry in enumerate(news.entries[:10]):
         with cols[i % 2]:
             with st.container(border=True):
-                # 뉴스 메타 정보
+                # 제목/출처 정제 (영어 뉴스도 ' - Source' 형식은 동일함)
                 if ' - ' in entry.title:
                     clean_title = entry.title.rsplit(' - ', 1)[0]
                     source_name = entry.title.rsplit(' - ', 1)[1]
@@ -221,26 +207,29 @@ if news and news.entries:
                     clean_title = entry.title
                     source_name = "NEWS"
                 
-                # 상단 배지 (출처)
-                st.markdown(f"<span class='badge-source'>{source_name}</span> <span style='color:#999; font-size:11px;'>{entry.published[5:16]}</span>", unsafe_allow_html=True)
+                # 상단 배지
+                st.markdown(f"<span class='badge-source'>{source_name}</span> <span style='color:#999; font-size:11px;'>{entry.published[:16]}</span>", unsafe_allow_html=True)
                 
-                # 제목 (Serif 폰트 적용)
+                # 제목 (Serif)
                 st.markdown(f"<h3 style='margin-top: 8px; font-size: 20px; line-height: 1.4; margin-bottom: 15px;'>{clean_title}</h3>", unsafe_allow_html=True)
                 
                 article_id = entry.link
                 
-                # 분석 버튼
-                if st.button("ANALYZE BIAS", key=f"btn_{i}", use_container_width=True):
-                    with st.spinner("Analyzing content..."):
-                        res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}")
+                # 분석 버튼 (미국 뉴스일 경우 번역 강조)
+                btn_label = "ANALYZE (KR)" if region_code == "US" else "ANALYZE BIAS"
+                
+                if st.button(btn_label, key=f"btn_{i}", use_container_width=True):
+                    with st.spinner("Analyzing & Translating..."):
+                        # AI에게 지역 코드(US/KR)를 같이 넘겨줍니다.
+                        res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
                         st.session_state[f"analysis_{article_id}"] = res
                 
                 if f"analysis_{article_id}" in st.session_state:
                     res = st.session_state[f"analysis_{article_id}"]
                     
                     if res:
-                        # 등급 배지 결정 (AllSides 스타일)
                         fact_score = res['scores'].get('fact_ratio', 50)
+                        
                         if fact_score >= 80:
                             badge_html = "<span class='badge-fact'>FACT-BASED</span>"
                             bar_color = "#27ae60"
@@ -253,22 +242,21 @@ if news and news.entries:
 
                         st.markdown(f"<div style='margin-top: 15px; margin-bottom: 5px;'>{badge_html}</div>", unsafe_allow_html=True)
                         
-                        # 팩트 게이지 바 (AllSides의 Meter 느낌)
                         st.markdown(f"""
                         <div style="width: 100%; background-color: #eee; height: 6px; border-radius: 3px; margin-bottom: 15px;">
                             <div style="width: {fact_score}%; background-color: {bar_color}; height: 6px; border-radius: 3px;"></div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # 분석 내용 박스
+                        # 분석 박스 (한국어 출력)
                         st.markdown(f"""
                         <div class='insight-box'>
-                            <b>SUMMARY</b><br>{res['summary']}<br><br>
-                            <b>IMPLICIT BIAS</b><br>{res['balance']['hidden']}
+                            <b>요약 (SUMMARY)</b><br>{res['summary']}<br><br>
+                            <b>숨겨진 맥락 (CONTEXT)</b><br>{res['balance']['hidden']}
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Q&A 섹션 (간소화)
+                        # Q&A 섹션
                         st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
                         
                         if article_id not in st.session_state.chat_history:
@@ -281,13 +269,13 @@ if news and news.entries:
                         with st.form(key=f"chat_form_{i}", clear_on_submit=True):
                             col_input, col_btn = st.columns([4, 1])
                             with col_input:
-                                user_q = st.text_input("Question", placeholder="Ask about context...", label_visibility="collapsed")
+                                user_q = st.text_input("질문", placeholder="내용이 이해가 안 가나요?", label_visibility="collapsed")
                             with col_btn:
-                                submit_btn = st.form_submit_button("Ask", use_container_width=True)
+                                submit_btn = st.form_submit_button("질문", use_container_width=True)
                             
                             if submit_btn and user_q:
                                 st.session_state.chat_history[article_id].append({"role": "user", "content": user_q})
-                                with st.spinner("..."):
+                                with st.spinner("답변 작성 중..."):
                                     ai_answer = ask_ai_about_news(f"Title: {clean_title}", user_q)
                                     st.session_state.chat_history[article_id].append({"role": "ai", "content": ai_answer})
                                 st.rerun()
