@@ -6,110 +6,92 @@ import requests
 import time
 import re
 
-# 1. 페이지 설정 (아이콘 변경)
-st.set_page_config(page_title="News Dietitian Premium", page_icon="💎", layout="wide")
+# 1. 페이지 설정
+st.set_page_config(page_title="News Dietitian : Fact Checker", page_icon="⚖️", layout="wide")
 
 # ==========================================
-# 🎨 [핵심] 고급스러운 UI 디자인 (CSS)
+# 🎨 AllSides 스타일: 전문적이고 신뢰감 있는 CSS
 # ==========================================
 st.markdown("""
 <style>
-    /* 폰트: 프리텐다드 적용 (가독성 최고) */
-    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
+    /* 폰트: 제목은 권위 있는 Serif(명조), 본문은 깔끔한 Sans-serif(고딕) */
+    @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Roboto:wght@300;400;500;700&display=swap');
     
     html, body, [class*="css"] { 
-        font-family: 'Pretendard', sans-serif !important; 
-        color: #1f2937;
-        background-color: #f3f4f6; /* 아주 연한 회색 배경 */
-    }
-
-    /* 메인 타이틀 스타일 */
-    h1 {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 800 !important;
-        letter-spacing: -1px;
-    }
-
-    /* 뉴스 카드 디자인 (그림자 + 둥근 모서리) */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border: 1px solid #f3f4f6;
-        padding: 20px;
-        transition: transform 0.2s ease-in-out;
+        font-family: 'Roboto', sans-serif !important; 
+        color: #333333;
+        background-color: #fcfcfc;
     }
     
-    /* 카드 호버 효과 (마우스 올리면 살짝 뜸) */
-    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    h1, h2, h3 {
+        font-family: 'Merriweather', serif !important;
+        font-weight: 900;
+        color: #2c3e50;
     }
 
-    /* 버튼 스타일 (그라데이션) */
-    .stButton > button {
-        background: linear-gradient(to right, #2563eb, #1d4ed8);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-        transition: all 0.3s;
-    }
-    .stButton > button:hover {
-        background: linear-gradient(to right, #1d4ed8, #1e40af);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-        transform: scale(1.02);
-    }
-
-    /* 분석 결과 박스 */
-    .insight-card { 
-        background-color: #f8fafc; 
-        padding: 16px; 
-        border-radius: 12px; 
-        border-left: 4px solid #3b82f6; 
-        margin-bottom: 12px; 
-    }
-    
-    /* 팩트/임팩트 헤더 */
-    .fact-header { 
-        font-size: 11px; 
-        font-weight: 700; 
-        color: #64748b; 
-        text-transform: uppercase; 
-        letter-spacing: 0.05em;
-        margin-bottom: 4px; 
-    }
-    
-    /* 채팅창 디자인 (아이메시지 스타일) */
-    .user-chat { 
-        background-color: #3b82f6; 
-        color: white; 
-        padding: 10px 16px; 
-        border-radius: 18px 18px 0 18px; 
-        margin-bottom: 8px; 
-        text-align: right; 
-        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
-        max-width: 85%;
-        margin-left: auto;
-    }
-    .ai-chat { 
-        background-color: #e2e8f0; 
-        color: #1e293b; 
-        padding: 10px 16px; 
-        border-radius: 18px 18px 18px 0; 
-        margin-bottom: 8px; 
-        text-align: left; 
-        max-width: 85%;
-    }
-
-    /* 사이드바 스타일 */
+    /* 사이드바 스타일 (신문 1면 사이드바 느낌) */
     section[data-testid="stSidebar"] {
         background-color: #ffffff;
-        border-right: 1px solid #e5e7eb;
+        border-right: 1px solid #e0e0e0;
     }
+
+    /* 뉴스 카드 컨테이너 (각진 모서리, 미니멀한 그림자) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px; /* 둥근 느낌 제거 */
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: all 0.2s;
+        margin-bottom: 16px;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border-color: #b0b0b0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+    }
+
+    /* 버튼 스타일 (언론사 구독 버튼 느낌) */
+    .stButton > button {
+        background-color: #ffffff;
+        color: #2c3e50;
+        border: 1px solid #2c3e50;
+        border-radius: 2px;
+        font-weight: 600;
+        font-family: 'Roboto', sans-serif;
+        text-transform: uppercase;
+        font-size: 12px;
+        padding: 0.4rem 1rem;
+        transition: all 0.2s;
+    }
+    .stButton > button:hover {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border-color: #2c3e50;
+    }
+
+    /* 커스텀 배지 스타일 */
+    .badge-fact { background-color: #27ae60; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
+    .badge-mixed { background-color: #f39c12; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
+    .badge-opinion { background-color: #c0392b; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border-radius: 2px; letter-spacing: 0.05em; }
+    .badge-source { background-color: #ecf0f1; color: #7f8c8d; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; border-radius: 2px; margin-right: 6px; }
+
+    /* 분석 결과 박스 (신문 사설 느낌) */
+    .insight-box {
+        background-color: #f9f9f9;
+        border-left: 4px solid #34495e;
+        padding: 15px 20px;
+        font-family: 'Merriweather', serif;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #2c3e50;
+        margin-top: 15px;
+    }
+
+    /* 채팅 스타일 */
+    .chat-user { text-align: right; margin: 8px 0; color: #555; font-size: 13px; font-style: italic; }
+    .chat-ai { text-align: left; margin: 8px 0; font-weight: 600; color: #2c3e50; font-size: 13px; }
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +106,6 @@ except Exception as e:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = {}
 
-# 🧼 JSON 세탁기
 def safe_parse_json(raw_text):
     try:
         clean_text = re.sub(r'```json\s*|```\s*', '', raw_text).strip()
@@ -138,33 +119,32 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 🧠 AI 기능
+# 🧠 AI 분석
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text):
-    system_prompt = "당신은 세련되고 명쾌한 뉴스 큐레이터입니다. 초심자도 이해하기 쉬운 비유로 설명하고, JSON으로 출력하세요."
+    # AllSides 스타일의 전문적인 분석 요청
+    system_prompt = "You are a professional news analyst like AllSides. Analyze the bias, factuality, and context strictly. Output JSON."
     
     user_prompt = f"""
-    [뉴스]: {news_text[:2000]}
+    [Article]: {news_text[:2500]}
     
-    [형식]:
+    [Output Format (JSON Only)]:
     {{
-        "title": "호기심을 자극하는 제목",
-        "summary": "핵심을 찌르는 쉬운 요약",
+        "title": "Unbiased Headline",
+        "summary": "Neutral summary (1-2 sentences)",
         "metrics": {{
-            "who": "주인공",
-            "whom": "영향받는 대상",
-            "action": "핵심 사건",
-            "impact": "나에게 미치는 영향"
+            "who": "Key Actor",
+            "impact": "Core Impact"
         }},
         "scores": {{
-            "fact_ratio": 0~100 숫자,
-            "opinion_ratio": 0~100 숫자
+            "fact_ratio": Number (0-100),
+            "opinion_ratio": Number (0-100)
         }},
         "balance": {{
-            "stated": "표면적 명분",
-            "hidden": "숨겨진 의도",
-            "note": "인사이트"
+            "stated": "Explicit Claim",
+            "hidden": "Implicit Bias/Context",
+            "rating": "FACT" or "MIXED" or "OPINION"
         }}
     }}
     """
@@ -176,7 +156,7 @@ def analyze_news_groq(news_text):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,
+            temperature=0.1, # 사실 기반 분석을 위해 온도를 낮춤
             response_format={"type": "json_object"}
         )
         return safe_parse_json(completion.choices[0].message.content)
@@ -188,42 +168,43 @@ def ask_ai_about_news(news_context, user_question):
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "당신은 위트 있고 똑똑한 뉴스 비서입니다."},
-                {"role": "user", "content": f"기사 내용: {news_context}\n\n질문: {user_question}"}
+                {"role": "system", "content": "You are a neutral news assistant."},
+                {"role": "user", "content": f"Context: {news_context}\n\nQuestion: {user_question}"}
             ],
             temperature=0.5
         )
         return completion.choices[0].message.content
     except:
-        return "죄송해요, 답변이 어렵네요."
+        return "Analysis unavailable."
 
 # --- 화면 구성 ---
 
-st.sidebar.markdown("## 💎 Premium News")
-st.sidebar.info("엄선된 구글 뉴스 엔진이 실시간으로 뉴스를 큐레이션합니다.")
+st.sidebar.markdown("<h2 style='text-align: center; color: #2c3e50;'>NEWS<br>DIETITIAN</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.caption("CURATED FEEDS")
 
 category = st.sidebar.radio(
-    "섹션 선택",
-    ("🔥 주요 헤드라인", "🏛️ 정치/사회", "💼 경제/금융", "🌏 글로벌", "🧬 테크/과학")
+    "TOPICS",
+    ("HEADLINES", "POLITICS", "BUSINESS", "WORLD", "TECH")
 )
 
 rss_feeds = {
-    "🔥 주요 헤드라인": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
-    "🏛️ 정치/사회": "https://news.google.com/rss/headlines/section/topic/POLITICS?hl=ko&gl=KR&ceid=KR:ko",
-    "💼 경제/금융": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko",
-    "🌏 글로벌": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ko&gl=KR&ceid=KR:ko",
-    "🧬 테크/과학": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ko&gl=KR&ceid=KR:ko"
+    "HEADLINES": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
+    "POLITICS": "https://news.google.com/rss/headlines/section/topic/POLITICS?hl=ko&gl=KR&ceid=KR:ko",
+    "BUSINESS": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko",
+    "WORLD": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ko&gl=KR&ceid=KR:ko",
+    "TECH": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ko&gl=KR&ceid=KR:ko"
 }
 
-st.markdown(f"<h1>{category}</h1>", unsafe_allow_html=True)
-st.caption("AI가 복잡한 뉴스를 영양가 있게 소화시켜 드립니다.")
+# 메인 헤더 (신문 타이틀 느낌)
+st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category}</h1>", unsafe_allow_html=True)
 
 try:
     headers = {"User-Agent": "Mozilla/5.0"}
     resp = requests.get(rss_feeds.get(category), headers=headers, timeout=5)
     news = feedparser.parse(resp.content)
 except:
-    st.error("뉴스 피드를 연결할 수 없습니다.")
+    st.error("Feed Unavailable")
     news = None
 
 if news and news.entries:
@@ -231,88 +212,84 @@ if news and news.entries:
     
     for i, entry in enumerate(news.entries[:10]):
         with cols[i % 2]:
-            # 카드형 디자인 적용 (st.container 활용)
             with st.container(border=True):
-                # 제목 및 출처 정리
+                # 뉴스 메타 정보
                 if ' - ' in entry.title:
                     clean_title = entry.title.rsplit(' - ', 1)[0]
                     source_name = entry.title.rsplit(' - ', 1)[1]
                 else:
                     clean_title = entry.title
-                    source_name = "News"
+                    source_name = "NEWS"
                 
-                # 상단 메타 정보 (뱃지 스타일)
-                st.markdown(
-                    f"""<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
-                        <span style='background:#eff6ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:12px; font-weight:600;'>{source_name}</span>
-                        <span style='color:#94a3b8; font-size:12px;'>{entry.published[5:16]}</span>
-                    </div>""", 
-                    unsafe_allow_html=True
-                )
+                # 상단 배지 (출처)
+                st.markdown(f"<span class='badge-source'>{source_name}</span> <span style='color:#999; font-size:11px;'>{entry.published[5:16]}</span>", unsafe_allow_html=True)
                 
-                st.markdown(f"<h3 style='margin-top:0; font-size:18px; line-height:1.4;'>{clean_title}</h3>", unsafe_allow_html=True)
+                # 제목 (Serif 폰트 적용)
+                st.markdown(f"<h3 style='margin-top: 8px; font-size: 20px; line-height: 1.4; margin-bottom: 15px;'>{clean_title}</h3>", unsafe_allow_html=True)
                 
                 article_id = entry.link
                 
-                # 버튼 (전체 너비)
-                if st.button("✨ AI 심층 분석", key=f"btn_{i}", use_container_width=True):
-                    with st.spinner("💎 프리미엄 인사이트 추출 중..."):
-                        res = analyze_news_groq(f"제목: {clean_title}\n내용: {entry.title}")
+                # 분석 버튼
+                if st.button("ANALYZE BIAS", key=f"btn_{i}", use_container_width=True):
+                    with st.spinner("Analyzing content..."):
+                        res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}")
                         st.session_state[f"analysis_{article_id}"] = res
                 
-                # 분석 결과 표시
                 if f"analysis_{article_id}" in st.session_state:
                     res = st.session_state[f"analysis_{article_id}"]
                     
                     if res:
-                        st.markdown("<hr style='margin: 15px 0; border-color: #f1f5f9;'>", unsafe_allow_html=True)
-                        st.markdown(f"**💡 {res['title']}**")
-                        st.success(res['summary'])
-                        
-                        # 게이지 바
+                        # 등급 배지 결정 (AllSides 스타일)
                         fact_score = res['scores'].get('fact_ratio', 50)
-                        st.caption(f"📊 팩트 지수: {fact_score}%")
-                        st.progress(fact_score / 100)
-                        
-                        # 2열 정보 카드
-                        c1, c2 = st.columns(2)
-                        with c1: st.markdown(f"<div class='insight-card'><div class='fact-header'>WHO (주인공)</div><div class='fact-content'>{res['metrics']['who']}</div></div>", unsafe_allow_html=True)
-                        with c2: st.markdown(f"<div class='insight-card'><div class='fact-header'>IMPACT (나의 삶)</div><div class='fact-content'>{res['metrics']['impact']}</div></div>", unsafe_allow_html=True)
-                        
-                        # 아코디언 스타일
-                        with st.expander("🔍 숨겨진 의도와 맥락 더보기"):
-                            st.markdown(f"**🗣️ 명분:** {res['balance']['stated']}")
-                            st.markdown(f"**🕵️ 속마음:** {res['balance']['hidden']}")
-                            st.info(f"💡 Insight: {res['balance']['note']}")
+                        if fact_score >= 80:
+                            badge_html = "<span class='badge-fact'>FACT-BASED</span>"
+                            bar_color = "#27ae60"
+                        elif fact_score >= 50:
+                            badge_html = "<span class='badge-mixed'>MIXED</span>"
+                            bar_color = "#f39c12"
+                        else:
+                            badge_html = "<span class='badge-opinion'>OPINION</span>"
+                            bar_color = "#c0392b"
 
-                        st.markdown("---")
+                        st.markdown(f"<div style='margin-top: 15px; margin-bottom: 5px;'>{badge_html}</div>", unsafe_allow_html=True)
                         
-                        # 채팅 UI
-                        st.markdown("##### 💬 AI 에디터와 대화하기")
+                        # 팩트 게이지 바 (AllSides의 Meter 느낌)
+                        st.markdown(f"""
+                        <div style="width: 100%; background-color: #eee; height: 6px; border-radius: 3px; margin-bottom: 15px;">
+                            <div style="width: {fact_score}%; background-color: {bar_color}; height: 6px; border-radius: 3px;"></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # 분석 내용 박스
+                        st.markdown(f"""
+                        <div class='insight-box'>
+                            <b>SUMMARY</b><br>{res['summary']}<br><br>
+                            <b>IMPLICIT BIAS</b><br>{res['balance']['hidden']}
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # Q&A 섹션 (간소화)
+                        st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
                         
                         if article_id not in st.session_state.chat_history:
                             st.session_state.chat_history[article_id] = []
 
-                        # 대화 내용 렌더링
                         for chat in st.session_state.chat_history[article_id]:
-                            if chat["role"] == "user":
-                                st.markdown(f"<div class='user-chat'>{chat['content']}</div>", unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"<div class='ai-chat'>{chat['content']}</div>", unsafe_allow_html=True)
+                            role_class = "chat-user" if chat["role"] == "user" else "chat-ai"
+                            st.markdown(f"<div class='{role_class}'>{chat['content']}</div>", unsafe_allow_html=True)
 
-                        # 입력창
                         with st.form(key=f"chat_form_{i}", clear_on_submit=True):
                             col_input, col_btn = st.columns([4, 1])
                             with col_input:
-                                user_q = st.text_input("질문", placeholder="이 뉴스, 호재인가요?", label_visibility="collapsed")
+                                user_q = st.text_input("Question", placeholder="Ask about context...", label_visibility="collapsed")
                             with col_btn:
-                                submit_btn = st.form_submit_button("전송", use_container_width=True)
+                                submit_btn = st.form_submit_button("Ask", use_container_width=True)
                             
                             if submit_btn and user_q:
                                 st.session_state.chat_history[article_id].append({"role": "user", "content": user_q})
-                                with st.spinner("작성 중..."):
-                                    ai_answer = ask_ai_about_news(f"제목: {clean_title}", user_q)
+                                with st.spinner("..."):
+                                    ai_answer = ask_ai_about_news(f"Title: {clean_title}", user_q)
                                     st.session_state.chat_history[article_id].append({"role": "ai", "content": ai_answer})
                                 st.rerun()
 
-                st.link_button("기사 원문 읽기", entry.link, use_container_width=True)
+                st.link_button("READ FULL ARTICLE", entry.link, use_container_width=True)
