@@ -10,7 +10,7 @@ import re
 st.set_page_config(page_title="News Dietitian : Global", page_icon="🌎", layout="wide")
 
 # ==========================================
-# 🎨 UI Style (AllSides Professional)
+# 🎨 UI Style (Tooltip 기능 추가됨!)
 # ==========================================
 st.markdown("""
 <style>
@@ -32,10 +32,78 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         margin-bottom: 16px;
     }
+
+    /* --- [업그레이드된 라벨 스타일 시작] --- */
     
-    .badge-fact { background-color: #27ae60; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
-    .badge-mixed { background-color: #f39c12; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
-    .badge-opinion { background-color: #c0392b; color: white; padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 2px; }
+    /* 라벨 컨테이너 (버튼 모양) */
+    .label-container {
+        position: relative;
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 4px;
+        color: white;
+        font-weight: 800;
+        font-size: 11px;
+        cursor: help; /* 마우스 올리면 물음표 커서 */
+        margin-right: 5px;
+        transition: transform 0.2s;
+    }
+    
+    .label-container:hover {
+        transform: translateY(-2px); /* 살짝 떠오르는 효과 */
+    }
+
+    /* 색상 정의 */
+    .fact-based { background-color: #27ae60; } /* 초록 */
+    .mixed { background-color: #f39c12; }      /* 주황 */
+    .opinion { background-color: #c0392b; }    /* 빨강 */
+
+    /* 숨겨진 말풍선 (Tooltip) */
+    .tooltip-text {
+        visibility: hidden;
+        width: 200px;
+        background-color: #2c3e50; /* 짙은 남색 배경 */
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 11px;
+        font-weight: normal;
+        line-height: 1.4;
+
+        /* 위치: 라벨 바로 위 */
+        position: absolute;
+        bottom: 135%; 
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 999; /* 제일 위에 뜨게 */
+        
+        /* 나타나는 효과 */
+        opacity: 0;
+        transition: opacity 0.3s, bottom 0.3s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+
+    /* 말풍선 꼬리 (삼각형) */
+    .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #2c3e50 transparent transparent transparent;
+    }
+
+    /* 마우스 올렸을 때 말풍선 보이기 */
+    .label-container:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+        bottom: 125%; /* 살짝 움직임 */
+    }
+    /* --- [스타일 끝] --- */
+
     .badge-source { background-color: #ecf0f1; color: #7f8c8d; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; border-radius: 2px; margin-right: 6px; }
 
     .insight-box {
@@ -231,17 +299,42 @@ if news and news.entries:
                     if res:
                         fact_score = res['scores'].get('fact_ratio', 50)
                         
+                        # ==========================================
+                        # 🏷️ [수정됨] 툴팁이 적용된 라벨 생성 로직
+                        # ==========================================
                         if fact_score >= 80:
-                            badge_html = "<span class='badge-fact'>FACT-BASED</span>"
+                            # 1. Fact-based
+                            badge_class = "fact-based"
+                            label_text = "FACT-BASED"
+                            # 한국어/영어 설명 분기
+                            tooltip_desc = "작성자의 의견을 배제하고,<br>검증된 사실과 데이터만 담았습니다." if region_code == "KR" else "Strictly based on facts and data,<br>without personal opinion."
                             bar_color = "#27ae60"
-                        elif fact_score >= 50:
-                            badge_html = "<span class='badge-mixed'>MIXED</span>"
-                            bar_color = "#f39c12"
-                        else:
-                            badge_html = "<span class='badge-opinion'>OPINION</span>"
-                            bar_color = "#c0392b"
 
-                        st.markdown(f"<div style='margin-top: 15px; margin-bottom: 5px;'>{badge_html}</div>", unsafe_allow_html=True)
+                        elif fact_score >= 50:
+                            # 2. Mixed
+                            badge_class = "mixed"
+                            label_text = "MIXED"
+                            tooltip_desc = "사실적인 정보에 작성자의<br>개인적인 해석이나 견해가 섞여 있습니다." if region_code == "KR" else "Factual information mixed with<br>personal interpretation or opinion."
+                            bar_color = "#f39c12"
+
+                        else:
+                            # 3. Opinion
+                            badge_class = "opinion"
+                            label_text = "OPINION"
+                            tooltip_desc = "작성자의 주관적인 주장이나<br>감정적 호소가 주를 이룹니다." if region_code == "KR" else "Primarily consists of subjective arguments<br>or emotional appeals."
+                            bar_color = "#c0392b"
+                        
+                        # HTML 조립 (말풍선 구조)
+                        badge_html = f"""
+                        <div style='margin-top: 15px; margin-bottom: 5px;'>
+                            <span class='label-container {badge_class}'>
+                                {label_text}
+                                <span class='tooltip-text'>{tooltip_desc}</span>
+                            </span>
+                        </div>
+                        """
+
+                        st.markdown(badge_html, unsafe_allow_html=True)
                         
                         # Fact Gauge
                         st.markdown(f"""
