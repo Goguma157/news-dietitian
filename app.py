@@ -10,7 +10,7 @@ import re
 st.set_page_config(page_title="News Dietitian : Global", page_icon="🌎", layout="wide")
 
 # ==========================================
-# 🎨 UI Style (Tooltip 기능 추가됨!)
+# 🎨 UI Style (툴팁 기능 + 깔끔한 디자인)
 # ==========================================
 st.markdown("""
 <style>
@@ -33,9 +33,7 @@ st.markdown("""
         margin-bottom: 16px;
     }
 
-    /* --- [업그레이드된 라벨 스타일 시작] --- */
-    
-    /* 라벨 컨테이너 (버튼 모양) */
+    /* --- [라벨 & 말풍선 스타일] --- */
     .label-container {
         position: relative;
         display: inline-block;
@@ -44,25 +42,25 @@ st.markdown("""
         color: white;
         font-weight: 800;
         font-size: 11px;
-        cursor: help; /* 마우스 올리면 물음표 커서 */
+        cursor: help; 
         margin-right: 5px;
         transition: transform 0.2s;
     }
     
     .label-container:hover {
-        transform: translateY(-2px); /* 살짝 떠오르는 효과 */
+        transform: translateY(-2px); 
     }
 
     /* 색상 정의 */
-    .fact-based { background-color: #27ae60; } /* 초록 */
-    .mixed { background-color: #f39c12; }      /* 주황 */
-    .opinion { background-color: #c0392b; }    /* 빨강 */
+    .fact-based { background-color: #27ae60; } 
+    .mixed { background-color: #f39c12; }      
+    .opinion { background-color: #c0392b; }    
 
     /* 숨겨진 말풍선 (Tooltip) */
     .tooltip-text {
         visibility: hidden;
         width: 200px;
-        background-color: #2c3e50; /* 짙은 남색 배경 */
+        background-color: #2c3e50;
         color: #fff;
         text-align: center;
         border-radius: 6px;
@@ -71,20 +69,18 @@ st.markdown("""
         font-weight: normal;
         line-height: 1.4;
 
-        /* 위치: 라벨 바로 위 */
         position: absolute;
         bottom: 135%; 
         left: 50%;
         transform: translateX(-50%);
-        z-index: 999; /* 제일 위에 뜨게 */
+        z-index: 999; 
         
-        /* 나타나는 효과 */
         opacity: 0;
         transition: opacity 0.3s, bottom 0.3s;
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
     }
 
-    /* 말풍선 꼬리 (삼각형) */
+    /* 말풍선 꼬리 */
     .tooltip-text::after {
         content: "";
         position: absolute;
@@ -96,11 +92,10 @@ st.markdown("""
         border-color: #2c3e50 transparent transparent transparent;
     }
 
-    /* 마우스 올렸을 때 말풍선 보이기 */
     .label-container:hover .tooltip-text {
         visibility: visible;
         opacity: 1;
-        bottom: 125%; /* 살짝 움직임 */
+        bottom: 125%; 
     }
     /* --- [스타일 끝] --- */
 
@@ -146,16 +141,17 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 🧠 AI Logic (Language Adaptive)
+# 🧠 AI Logic (Language Adaptive & No Hanja)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
     
-    # 🚨 언어 설정: 미국 뉴스면 영어로, 한국 뉴스면 한국어로 출력
+    # 🚨 언어 설정: 한자 사용 금지(No Hanja) 규칙 추가됨!
     if region_code == "US":
         lang_instruction = "Answer strictly in English."
     else:
-        lang_instruction = "Answer strictly in Korean."
+        # 여기에 'Hangul ONLY' 조건을 강력하게 추가했습니다.
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja) or Mixed script."
     
     system_prompt = f"""
     You are a professional news analyst like AllSides. 
@@ -203,7 +199,7 @@ def analyze_news_groq(news_text, region_code):
 
 def ask_ai_about_news(news_context, user_question, region_code):
     # 챗봇도 뉴스 언어에 맞춰서 대답
-    lang_instruction = "Answer in English." if region_code == "US" else "Answer in Korean."
+    lang_instruction = "Answer in English." if region_code == "US" else "Answer in Korean (Hangul only)."
     
     try:
         completion = client.chat.completions.create(
@@ -287,7 +283,7 @@ if news and news.entries:
                 
                 article_id = entry.link
                 
-                # Analyze Button (English)
+                # Analyze Button
                 if st.button("ANALYZE BIAS", key=f"btn_{i}", use_container_width=True):
                     with st.spinner("Analyzing..."):
                         res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
@@ -300,13 +296,12 @@ if news and news.entries:
                         fact_score = res['scores'].get('fact_ratio', 50)
                         
                         # ==========================================
-                        # 🏷️ [수정됨] 툴팁이 적용된 라벨 생성 로직
+                        # 🏷️ 툴팁이 적용된 라벨 생성 (No Hanja는 위에서 처리됨)
                         # ==========================================
                         if fact_score >= 80:
                             # 1. Fact-based
                             badge_class = "fact-based"
                             label_text = "FACT-BASED"
-                            # 한국어/영어 설명 분기
                             tooltip_desc = "작성자의 의견을 배제하고,<br>검증된 사실과 데이터만 담았습니다." if region_code == "KR" else "Strictly based on facts and data,<br>without personal opinion."
                             bar_color = "#27ae60"
 
@@ -324,7 +319,7 @@ if news and news.entries:
                             tooltip_desc = "작성자의 주관적인 주장이나<br>감정적 호소가 주를 이룹니다." if region_code == "KR" else "Primarily consists of subjective arguments<br>or emotional appeals."
                             bar_color = "#c0392b"
                         
-                        # HTML 조립 (말풍선 구조)
+                        # HTML 조립
                         badge_html = f"""
                         <div style='margin-top: 15px; margin-bottom: 5px;'>
                             <span class='label-container {badge_class}'>
@@ -343,7 +338,7 @@ if news and news.entries:
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Analysis Box (English Labels)
+                        # Analysis Box
                         st.markdown(f"""
                         <div class='insight-box'>
                             <b>SUMMARY</b><br>{res['summary']}<br><br>
@@ -351,7 +346,7 @@ if news and news.entries:
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Q&A Section (English Labels)
+                        # Q&A Section
                         st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
                         
                         if article_id not in st.session_state.chat_history:
