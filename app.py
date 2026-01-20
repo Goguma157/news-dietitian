@@ -265,11 +265,11 @@ def analyze_news_groq(news_text, region_code):
     except:
         return None
 
-# 🌟 [Visual Comparison]을 위한 프롬프트 강화
+# 🌟 [업데이트] AI 분석 함수 (성향 점수 요청 추가)
 @st.cache_data(show_spinner=False)
 def compare_news_groq(text_a, text_b, region_code):
     if region_code == "KR":
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja)."
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY."
         target_lang = "Korean"
     else:
         lang_instruction = "Answer strictly in English."
@@ -278,7 +278,7 @@ def compare_news_groq(text_a, text_b, region_code):
     system_prompt = f"""
     You are an unbiased news comparator.
     Compare two articles on the same topic strictly.
-    Identify the key stance (Left/Right/Neutral/Critical/Supportive) and the tone.
+    Quantify the stance on a scale from -10 to +10.
     {lang_instruction}
     Output JSON format ONLY.
     """
@@ -287,18 +287,24 @@ def compare_news_groq(text_a, text_b, region_code):
     [Article A]: {text_a[:2000]}
     [Article B]: {text_b[:2000]}
 
+    [Instruction]:
+    Assign a 'stance_score' for each article from -10 to +10.
+    - -10 = Extremely Critical / Negative / Left-leaning
+    - 0 = Neutral / Balanced
+    - +10 = Extremely Supportive / Positive / Right-leaning
+    
     [Output Format (JSON Only)]:
     {{
         "core_difference": "One sentence summary of the main conflict in {target_lang}.",
-        "key_points": ["Point 1 diff", "Point 2 diff", "Point 3 diff"],
+        "key_points": ["Point 1", "Point 2", "Point 3"],
         "article_a": {{
-            "stance": "Short keyword (e.g., Critical) in {target_lang}",
-            "tone": "Short keyword (e.g., Emotional) in {target_lang}",
+            "stance_label": "Short keyword (e.g. Critical) in {target_lang}",
+            "stance_score": Integer (-10 to 10),
             "summary": "1 sentence summary in {target_lang}"
         }},
         "article_b": {{
-            "stance": "Short keyword in {target_lang}",
-            "tone": "Short keyword in {target_lang}",
+            "stance_label": "Short keyword in {target_lang}",
+            "stance_score": Integer (-10 to 10),
             "summary": "1 sentence summary in {target_lang}"
         }}
     }}
@@ -467,8 +473,64 @@ with tab1:
                                     st.rerun()
                     st.link_button("READ FULL ARTICLE", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Fixed) ---
+# --- TAB 2: Comparison Mode (Visual Spectrum Added) ---
 with tab2:
+    # 스타일 추가 (스펙트럼 바 전용)
+    st.markdown("""
+    <style>
+        .spectrum-container {
+            position: relative;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(90deg, #3498db 0%, #ecf0f1 50%, #e74c3c 100%);
+            border-radius: 30px;
+            margin: 20px 0 40px 0;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .center-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(0,0,0,0.1);
+            border-right: 1px dashed #999;
+        }
+        .marker {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 10;
+            transition: left 0.5s ease-out;
+        }
+        .marker-a { background-color: #2980b9; } /* Blue for A */
+        .marker-b { background-color: #c0392b; } /* Red for B */
+        
+        .marker-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     if region_code == "KR":
         txt = {
             "info": "💡 주제를 입력하고 검색하세요. (예: 의대 증원, 트럼프, 금리)",
@@ -478,7 +540,8 @@ with tab2:
             "analyzing": "두 기사의 관점을 치열하게 분석 중입니다...",
             "core_diff": "⚔️ 핵심 대립 포인트",
             "found": "개의 기사를 찾았습니다.",
-            "major": "메이저"
+            "major": "메이저",
+            "visual_title": "📊 성향 스펙트럼 (Stance Spectrum)"
         }
     else:
         txt = {
@@ -489,7 +552,8 @@ with tab2:
             "analyzing": "Analyzing conflict...",
             "core_diff": "⚔️ KEY CONFLICT",
             "found": "articles found.",
-            "major": "MAJOR"
+            "major": "MAJOR",
+            "visual_title": "📊 Stance Spectrum"
         }
 
     st.info(txt["info"])
@@ -507,7 +571,6 @@ with tab2:
             url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko" if region_code == "KR" else f"https://news.google.com/rss/search?q={search_query}&hl=en-US&gl=US&ceid=US:en"
             feed = feedparser.parse(url)
             
-            # 🌟 [로직] 메이저 언론사 우선 정렬
             all_entries = feed.entries[:20] 
             major_entries = []
             minor_entries = []
@@ -530,16 +593,12 @@ with tab2:
                 clean_title = entry.title.rsplit(' - ', 1)[0] if ' - ' in entry.title else entry.title
                 source_name = entry.title.rsplit(' - ', 1)[1] if ' - ' in entry.title else "NEWS"
                 
-                # [수정됨] HTML 태그 제거 -> 마크다운과 이모지로 변경
                 is_major = is_major_media(source_name, region_code)
-                
-                # ⭐ 메이저 언론사는 앞에 별과 굵은 표시
                 if is_major:
                     label = f"⭐ **[{source_name}]** {clean_title}"
                 else:
                     label = f"[{source_name}] {clean_title}"
                 
-                # [수정됨] unsafe_allow_html 제거
                 if st.checkbox(label, key=f"chk_{idx}"): 
                     selected_indices.append(entry)
             
@@ -551,43 +610,74 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 🌟 [Visual] VS 카드 디자인 적용
+                            # 1. 핵심 차이 요약
                             st.subheader(txt["core_diff"])
                             st.markdown(f"<div style='font-size:18px; font-weight:bold; margin-bottom:20px;'>{res['core_difference']}</div>", unsafe_allow_html=True)
                             
+                            # 2. [NEW] 성향 스펙트럼 시각화 (Balance Scale) 
+                            st.markdown(f"#### {txt['visual_title']}")
+                            
+                            # 점수 계산 (-10~10 -> 0~100%)
+                            score_a = res['article_a'].get('stance_score', 0)
+                            score_b = res['article_b'].get('stance_score', 0)
+                            
+                            pos_a = (score_a + 10) * 5  # 예: -10 -> 0%, 0 -> 50%, 10 -> 100%
+                            pos_b = (score_b + 10) * 5
+                            
+                            # HTML로 저울(Bar) 그리기
+                            st.markdown(f"""
+                            <div class="spectrum-container">
+                                <div class="center-line"></div>
+                                <div class="marker marker-a" style="left: {pos_a}%;">
+                                    A
+                                    <div class="marker-label">Article A</div>
+                                </div>
+                                <div class="marker marker-b" style="left: {pos_b}%;">
+                                    B
+                                    <div class="marker-label">Article B</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:#666; margin-top:-30px; margin-bottom:30px;">
+                                <span>◀ Critical / Negative</span>
+                                <span>Neutral</span>
+                                <span>Supportive / Positive ▶</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # 3. 상세 비교 카드
                             col_a, col_b = st.columns(2)
                             
-                            # Article A Card (Blue)
+                            # Article A
                             with col_a:
                                 src_a = art_a.title.rsplit(' - ', 1)[1] if ' - ' in art_a.title else "A"
                                 st.markdown(f"""
                                 <div class='vs-card vs-card-a'>
                                     <div class='vs-label'>ARTICLE A • {src_a}</div>
                                     <div class='vs-title'>{art_a.title}</div>
-                                    <div class='vs-tag'>{res['article_a']['stance']}</div>
-                                    <div class='vs-tag'>{res['article_a']['tone']}</div>
+                                    <div class='vs-tag'>Stance Score: {score_a}</div>
+                                    <div class='vs-tag'>{res['article_a']['stance_label']}</div>
                                     <hr style='border-color:rgba(255,255,255,0.3);'>
                                     <div style='font-size:13px; opacity:0.9;'>{res['article_a']['summary']}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
                                 st.link_button("Read A", art_a.link, use_container_width=True)
                             
-                            # Article B Card (Red)
+                            # Article B
                             with col_b:
                                 src_b = art_b.title.rsplit(' - ', 1)[1] if ' - ' in art_b.title else "B"
                                 st.markdown(f"""
                                 <div class='vs-card vs-card-b'>
                                     <div class='vs-label'>ARTICLE B • {src_b}</div>
                                     <div class='vs-title'>{art_b.title}</div>
-                                    <div class='vs-tag'>{res['article_b']['stance']}</div>
-                                    <div class='vs-tag'>{res['article_b']['tone']}</div>
+                                    <div class='vs-tag'>Stance Score: {score_b}</div>
+                                    <div class='vs-tag'>{res['article_b']['stance_label']}</div>
                                     <hr style='border-color:rgba(255,255,255,0.3);'>
                                     <div style='font-size:13px; opacity:0.9;'>{res['article_b']['summary']}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
                                 st.link_button("Read B", art_b.link, use_container_width=True)
 
-                            # Key Points Summary
+                            # Key Points
                             st.markdown("### 📌 Detail Points")
                             for point in res.get("key_points", []):
                                 st.info(point)
