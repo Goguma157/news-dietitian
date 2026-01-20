@@ -10,7 +10,7 @@ import re
 st.set_page_config(page_title="News Dietitian : Global", page_icon="🌎", layout="wide")
 
 # ==========================================
-# 🎨 UI Style (툴팁 기능 + 깔끔한 디자인)
+# 🎨 UI Style
 # ==========================================
 st.markdown("""
 <style>
@@ -141,16 +141,15 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 🧠 AI Logic (Language Adaptive & No Hanja)
+# 🧠 AI Logic
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
     
-    # 🚨 언어 설정: 한자 사용 금지(No Hanja) 규칙 추가됨!
     if region_code == "US":
         lang_instruction = "Answer strictly in English."
     else:
-        # 여기에 'Hangul ONLY' 조건을 강력하게 추가했습니다.
+        # 한글 전용 (No Hanja)
         lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja) or Mixed script."
     
     system_prompt = f"""
@@ -198,7 +197,6 @@ def analyze_news_groq(news_text, region_code):
         return None
 
 def ask_ai_about_news(news_context, user_question, region_code):
-    # 챗봇도 뉴스 언어에 맞춰서 대답
     lang_instruction = "Answer in English." if region_code == "US" else "Answer in Korean (Hangul only)."
     
     try:
@@ -228,7 +226,6 @@ region = st.sidebar.selectbox(
 
 st.sidebar.caption("CURATED FEEDS")
 
-# RSS Feeds Mapping
 if "Korea" in region:
     region_code = "KR"
     rss_categories = {
@@ -250,7 +247,6 @@ else:
 
 category = st.sidebar.radio("TOPICS", list(rss_categories.keys()))
 
-# Main Header
 st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category} <span style='font-size:18px; color:#666;'>({region_code})</span></h1>", unsafe_allow_html=True)
 
 try:
@@ -283,43 +279,62 @@ if news and news.entries:
                 
                 article_id = entry.link
                 
-                # Analyze Button
-                if st.button("ANALYZE BIAS", key=f"btn_{i}", use_container_width=True):
-                    with st.spinner("Analyzing..."):
-                        res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
-                        st.session_state[f"analysis_{article_id}"] = res
+                # ==========================================
+                # 🔄 [수정됨] 토글(열기/닫기) 로직 적용
+                # ==========================================
                 
-                if f"analysis_{article_id}" in st.session_state:
+                # 1. 상태 키(Key) 만들기: "이 기사의 분석창을 보여줄까요?"
+                view_key = f"view_{article_id}"
+                if view_key not in st.session_state:
+                    st.session_state[view_key] = False # 기본값은 닫힘
+
+                # 2. 버튼 텍스트와 스타일 결정 (상태에 따라 다르게)
+                if st.session_state[view_key]:
+                    btn_label = "CLOSE ✕" # 열려있으면 닫기 버튼
+                    btn_type = "secondary" # 회색 계열 버튼
+                else:
+                    btn_label = "ANALYZE BIAS" # 닫혀있으면 분석 버튼
+                    btn_type = "primary"   # 강조색 버튼
+
+                # 3. 버튼 클릭 처리
+                if st.button(btn_label, key=f"btn_{i}", type=btn_type, use_container_width=True):
+                    # 스위치 끄고 켜기 (True <-> False 반전)
+                    st.session_state[view_key] = not st.session_state[view_key]
+                    
+                    # 만약 켜는 상황이고, 분석 데이터가 없다면 분석 실행
+                    if st.session_state[view_key] and f"analysis_{article_id}" not in st.session_state:
+                        with st.spinner("Analyzing..."):
+                            res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
+                            st.session_state[f"analysis_{article_id}"] = res
+                    
+                    # 화면 갱신 (즉시 반영)
+                    st.rerun()
+                
+                # 4. 분석창 보여주기 (스위치가 켜져 있고, 데이터가 있을 때만)
+                if st.session_state[view_key] and f"analysis_{article_id}" in st.session_state:
                     res = st.session_state[f"analysis_{article_id}"]
                     
                     if res:
+                        st.markdown("---") # 구분선 추가
                         fact_score = res['scores'].get('fact_ratio', 50)
                         
-                        # ==========================================
-                        # 🏷️ 툴팁이 적용된 라벨 생성 (No Hanja는 위에서 처리됨)
-                        # ==========================================
+                        # 라벨 생성
                         if fact_score >= 80:
-                            # 1. Fact-based
                             badge_class = "fact-based"
                             label_text = "FACT-BASED"
                             tooltip_desc = "작성자의 의견을 배제하고,<br>검증된 사실과 데이터만 담았습니다." if region_code == "KR" else "Strictly based on facts and data,<br>without personal opinion."
                             bar_color = "#27ae60"
-
                         elif fact_score >= 50:
-                            # 2. Mixed
                             badge_class = "mixed"
                             label_text = "MIXED"
                             tooltip_desc = "사실적인 정보에 작성자의<br>개인적인 해석이나 견해가 섞여 있습니다." if region_code == "KR" else "Factual information mixed with<br>personal interpretation or opinion."
                             bar_color = "#f39c12"
-
                         else:
-                            # 3. Opinion
                             badge_class = "opinion"
                             label_text = "OPINION"
                             tooltip_desc = "작성자의 주관적인 주장이나<br>감정적 호소가 주를 이룹니다." if region_code == "KR" else "Primarily consists of subjective arguments<br>or emotional appeals."
                             bar_color = "#c0392b"
                         
-                        # HTML 조립
                         badge_html = f"""
                         <div style='margin-top: 15px; margin-bottom: 5px;'>
                             <span class='label-container {badge_class}'>
@@ -328,17 +343,16 @@ if news and news.entries:
                             </span>
                         </div>
                         """
-
                         st.markdown(badge_html, unsafe_allow_html=True)
                         
-                        # Fact Gauge
+                        # Gauge
                         st.markdown(f"""
                         <div style="width: 100%; background-color: #eee; height: 6px; border-radius: 3px; margin-bottom: 15px;">
                             <div style="width: {fact_score}%; background-color: {bar_color}; height: 6px; border-radius: 3px;"></div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Analysis Box
+                        # Insight Box
                         st.markdown(f"""
                         <div class='insight-box'>
                             <b>SUMMARY</b><br>{res['summary']}<br><br>
@@ -346,7 +360,7 @@ if news and news.entries:
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Q&A Section
+                        # Q&A
                         st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
                         
                         if article_id not in st.session_state.chat_history:
