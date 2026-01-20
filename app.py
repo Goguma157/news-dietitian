@@ -467,7 +467,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("READ FULL ARTICLE", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Enhanced) ---
+# --- TAB 2: Comparison Mode (Fixed) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -478,7 +478,7 @@ with tab2:
             "analyzing": "두 기사의 관점을 치열하게 분석 중입니다...",
             "core_diff": "⚔️ 핵심 대립 포인트",
             "found": "개의 기사를 찾았습니다.",
-            "major": "메이저 언론사"
+            "major": "메이저"
         }
     else:
         txt = {
@@ -489,7 +489,7 @@ with tab2:
             "analyzing": "Analyzing conflict...",
             "core_diff": "⚔️ KEY CONFLICT",
             "found": "articles found.",
-            "major": "Major Media"
+            "major": "MAJOR"
         }
 
     st.info(txt["info"])
@@ -508,7 +508,7 @@ with tab2:
             feed = feedparser.parse(url)
             
             # 🌟 [로직] 메이저 언론사 우선 정렬
-            all_entries = feed.entries[:20] # 20개 가져옴
+            all_entries = feed.entries[:20] 
             major_entries = []
             minor_entries = []
             
@@ -519,7 +519,6 @@ with tab2:
                 else:
                     minor_entries.append(e)
             
-            # 메이저 먼저 보여주고, 나머지는 뒤에 붙임
             st.session_state.comparison_news = major_entries + minor_entries
 
     if st.session_state.comparison_news:
@@ -531,12 +530,17 @@ with tab2:
                 clean_title = entry.title.rsplit(' - ', 1)[0] if ' - ' in entry.title else entry.title
                 source_name = entry.title.rsplit(' - ', 1)[1] if ' - ' in entry.title else "NEWS"
                 
-                # 메이저 뱃지 표시
+                # [수정됨] HTML 태그 제거 -> 마크다운과 이모지로 변경
                 is_major = is_major_media(source_name, region_code)
-                major_badge_html = f"<span class='major-badge'>⭐ {txt['major']}</span>" if is_major else ""
                 
-                label = f"{major_badge_html} <b>[{source_name}]</b> {clean_title}"
-                if st.checkbox(label, key=f"chk_{idx}", unsafe_allow_html=True): # unsafe_allow_html로 뱃지 렌더링
+                # ⭐ 메이저 언론사는 앞에 별과 굵은 표시
+                if is_major:
+                    label = f"⭐ **[{source_name}]** {clean_title}"
+                else:
+                    label = f"[{source_name}] {clean_title}"
+                
+                # [수정됨] unsafe_allow_html 제거
+                if st.checkbox(label, key=f"chk_{idx}"): 
                     selected_indices.append(entry)
             
             st.markdown("---")
