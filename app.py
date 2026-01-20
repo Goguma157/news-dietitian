@@ -23,7 +23,7 @@ st.markdown("""
     
     h1, h2, h3 { font-family: 'Merriweather', serif !important; font-weight: 900; color: #2c3e50; }
 
-    /* 탭(Tab) 스타일 커스텀 */
+    /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
@@ -48,7 +48,48 @@ st.markdown("""
         margin-bottom: 16px;
     }
 
-    /* --- [라벨 & 말풍선(Tooltip) 스타일] --- */
+    /* --- [VS 모드 시각화 스타일] --- */
+    .vs-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-top: 20px;
+        gap: 20px;
+    }
+    .vs-card {
+        flex: 1;
+        padding: 20px;
+        border-radius: 12px;
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .vs-card-a { background: linear-gradient(135deg, #3498db, #2980b9); } /* 파랑 (A) */
+    .vs-card-b { background: linear-gradient(135deg, #e74c3c, #c0392b); } /* 빨강 (B) */
+    
+    .vs-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; line-height: 1.4; height: 50px; overflow: hidden; }
+    .vs-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 5px; }
+    .vs-tag { 
+        background-color: rgba(255,255,255,0.2); 
+        padding: 4px 8px; 
+        border-radius: 4px; 
+        font-size: 12px; 
+        font-weight: bold; 
+        display: inline-block;
+        margin-top: 10px;
+    }
+    
+    .major-badge {
+        background-color: #f1c40f;
+        color: #333;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-right: 5px;
+        vertical-align: middle;
+    }
+
+    /* --- [기존 라벨 스타일] --- */
     .label-container {
         position: relative;
         display: inline-block;
@@ -62,7 +103,6 @@ st.markdown("""
         transition: transform 0.2s;
     }
     .label-container:hover { transform: translateY(-2px); }
-    
     .fact-based { background-color: #27ae60; } 
     .mixed { background-color: #f39c12; }      
     .opinion { background-color: #c0392b; }    
@@ -103,7 +143,6 @@ st.markdown("""
         bottom: 125%; 
     }
 
-    /* 해시태그 스타일 */
     .hashtag {
         background-color: #f0f2f6;
         color: #555;
@@ -115,18 +154,6 @@ st.markdown("""
         display: inline-block;
     }
     
-    /* 비교 모드 배지 스타일 */
-    .vs-badge {
-        background-color: #2c3e50;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 12px;
-        margin-bottom: 5px;
-        display: inline-block;
-    }
-
     .badge-source { background-color: #ecf0f1; color: #7f8c8d; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; border-radius: 2px; margin-right: 6px; }
 
     .insight-box {
@@ -146,7 +173,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 유틸리티 및 Groq 설정
+# 2. 메이저 언론사 리스트 (필터링용)
+# ==========================================
+MAJOR_KR = ["조선일보", "중앙일보", "동아일보", "한겨레", "경향신문", "한국일보", "매일경제", "한국경제", "KBS", "MBC", "SBS", "JTBC", "YTN", "연합뉴스"]
+MAJOR_US = ["CNN", "Fox News", "New York Times", "Washington Post", "Reuters", "Associated Press", "BBC", "NBC", "CNBC", "Bloomberg", "USA Today", "Wall Street Journal"]
+
+def is_major_media(source_name, region_code):
+    target_list = MAJOR_KR if region_code == "KR" else MAJOR_US
+    # 대소문자 무시하고 포함 여부 확인
+    return any(m.lower() in source_name.lower() for m in target_list)
+
+# ==========================================
+# 3. Groq 설정
 # ==========================================
 try:
     api_key = st.secrets["GROQ_API_KEY"]
@@ -171,14 +209,13 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 3. AI 분석 로직 (단일 분석 & 비교 분석)
+# 4. AI 분석 로직
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
     
-    # 한국어 모드일 경우 한글 전용(한자 금지) 프롬프트
     if region_code == "KR":
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja) or Mixed script."
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja)."
     else:
         lang_instruction = "Answer strictly in English."
     
@@ -228,6 +265,7 @@ def analyze_news_groq(news_text, region_code):
     except:
         return None
 
+# 🌟 [Visual Comparison]을 위한 프롬프트 강화
 @st.cache_data(show_spinner=False)
 def compare_news_groq(text_a, text_b, region_code):
     if region_code == "KR":
@@ -239,7 +277,8 @@ def compare_news_groq(text_a, text_b, region_code):
 
     system_prompt = f"""
     You are an unbiased news comparator.
-    Compare two articles on the same topic and identify the differences in perspective, tone, and framing.
+    Compare two articles on the same topic strictly.
+    Identify the key stance (Left/Right/Neutral/Critical/Supportive) and the tone.
     {lang_instruction}
     Output JSON format ONLY.
     """
@@ -250,14 +289,17 @@ def compare_news_groq(text_a, text_b, region_code):
 
     [Output Format (JSON Only)]:
     {{
-        "core_difference": "Summarize the main conflict or difference in viewpoint (3 bullet points max) in {target_lang}.",
+        "core_difference": "One sentence summary of the main conflict in {target_lang}.",
+        "key_points": ["Point 1 diff", "Point 2 diff", "Point 3 diff"],
         "article_a": {{
-            "stance": "Brief stance description in {target_lang}",
-            "tone": "Tone keyword (e.g., Critical, Supportive) in {target_lang}"
+            "stance": "Short keyword (e.g., Critical) in {target_lang}",
+            "tone": "Short keyword (e.g., Emotional) in {target_lang}",
+            "summary": "1 sentence summary in {target_lang}"
         }},
         "article_b": {{
-            "stance": "Brief stance description in {target_lang}",
-            "tone": "Tone keyword in {target_lang}"
+            "stance": "Short keyword in {target_lang}",
+            "tone": "Short keyword in {target_lang}",
+            "summary": "1 sentence summary in {target_lang}"
         }}
     }}
     """
@@ -292,7 +334,7 @@ def ask_ai_about_news(news_context, user_question, region_code):
         return "Sorry, I cannot answer right now."
 
 # ==========================================
-# 4. 사이드바 및 메인 레이아웃
+# 5. UI Layout
 # ==========================================
 st.sidebar.markdown("<h2 style='text-align: center; color: #2c3e50;'>NEWS<br>DIETITIAN</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
@@ -322,7 +364,6 @@ else:
 category = st.sidebar.radio("TOPICS", list(rss_categories.keys()))
 st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category} <span style='font-size:18px; color:#666;'>({region_code})</span></h1>", unsafe_allow_html=True)
 
-# 초기 뉴스 피드 로드
 try:
     headers = {"User-Agent": "Mozilla/5.0"}
     resp = requests.get(rss_categories.get(category), headers=headers, timeout=5)
@@ -332,19 +373,17 @@ except:
     news = None
 
 # ==========================================
-# 5. 탭 구성 (Tab 1: 피드 / Tab 2: 비교)
+# 6. TABS (Feed / Comparison)
 # ==========================================
 tab1, tab2 = st.tabs(["📰 Daily Feed", "⚖️ Comparison Mode"])
 
-# --- [TAB 1] 데일리 뉴스 피드 ---
+# --- TAB 1: Daily Feed ---
 with tab1:
     if news and news.entries:
         cols = st.columns(2)
-        
         for i, entry in enumerate(news.entries[:10]):
             with cols[i % 2]:
                 with st.container(border=True):
-                    # 제목 및 출처 정리
                     if ' - ' in entry.title:
                         clean_title = entry.title.rsplit(' - ', 1)[0]
                         source_name = entry.title.rsplit(' - ', 1)[1]
@@ -356,13 +395,9 @@ with tab1:
                     st.markdown(f"<h3 style='margin-top: 8px; font-size: 20px; line-height: 1.4; margin-bottom: 15px;'>{clean_title}</h3>", unsafe_allow_html=True)
                     
                     article_id = entry.link
-                    
-                    # >>> 토글(Toggle) 로직 <<<
                     view_key = f"view_{article_id}"
-                    if view_key not in st.session_state:
-                        st.session_state[view_key] = False
+                    if view_key not in st.session_state: st.session_state[view_key] = False
 
-                    # 버튼 텍스트 변경
                     if st.session_state[view_key]:
                         btn_label = "CLOSE ✕"
                         btn_type = "secondary"
@@ -372,67 +407,41 @@ with tab1:
 
                     if st.button(btn_label, key=f"btn_{i}", type=btn_type, use_container_width=True):
                         st.session_state[view_key] = not st.session_state[view_key]
-                        
-                        # 분석 데이터가 없으면 실행
                         if st.session_state[view_key] and f"analysis_{article_id}" not in st.session_state:
                             with st.spinner("Analyzing..."):
                                 res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
                                 st.session_state[f"analysis_{article_id}"] = res
                         st.rerun()
                     
-                    # >>> 분석 결과 표시 <<<
                     if st.session_state[view_key] and f"analysis_{article_id}" in st.session_state:
                         res = st.session_state[f"analysis_{article_id}"]
-                        
                         if res:
                             st.markdown("---")
-                            
-                            # [해시태그]
                             if "keywords" in res and res["keywords"]:
-                                tags_html = ""
-                                for tag in res["keywords"]:
-                                    tags_html += f"<span class='hashtag'>#{tag}</span>"
+                                tags_html = "".join([f"<span class='hashtag'>#{tag}</span>" for tag in res["keywords"]])
                                 st.markdown(f"<div style='margin-bottom:10px;'>{tags_html}</div>", unsafe_allow_html=True)
 
                             fact_score = res['scores'].get('fact_ratio', 50)
-                            
-                            # [라벨 및 툴팁] 내용 설정
                             if fact_score >= 80:
-                                badge_class = "fact-based"
-                                label_text = "FACT-BASED"
+                                badge_class, label_text, bar_color = "fact-based", "FACT-BASED", "#27ae60"
                                 tooltip_desc = "작성자의 의견을 배제하고,<br>검증된 사실과 데이터만 담았습니다." if region_code == "KR" else "Strictly based on facts and data,<br>without personal opinion."
-                                bar_color = "#27ae60"
                             elif fact_score >= 50:
-                                badge_class = "mixed"
-                                label_text = "MIXED"
+                                badge_class, label_text, bar_color = "mixed", "MIXED", "#f39c12"
                                 tooltip_desc = "사실적인 정보에 작성자의<br>개인적인 해석이나 견해가 섞여 있습니다." if region_code == "KR" else "Factual information mixed with<br>personal interpretation or opinion."
-                                bar_color = "#f39c12"
                             else:
-                                badge_class = "opinion"
-                                label_text = "OPINION"
+                                badge_class, label_text, bar_color = "opinion", "OPINION", "#c0392b"
                                 tooltip_desc = "작성자의 주관적인 주장이나<br>감정적 호소가 주를 이룹니다." if region_code == "KR" else "Primarily consists of subjective arguments<br>or emotional appeals."
-                                bar_color = "#c0392b"
                             
-                            badge_html = f"""
-                            <div style='margin-top: 5px; margin-bottom: 5px;'>
-                                <span class='label-container {badge_class}'>
-                                    {label_text}
-                                    <span class='tooltip-text'>{tooltip_desc}</span>
-                                </span>
-                            </div>
-                            """
-                            st.markdown(badge_html, unsafe_allow_html=True)
-                            
-                            # [게이지 바]
                             st.markdown(f"""
+                            <div style='margin-top: 5px; margin-bottom: 5px;'>
+                                <span class='label-container {badge_class}'>{label_text}<span class='tooltip-text'>{tooltip_desc}</span></span>
+                            </div>
                             <div style="width: 100%; background-color: #eee; height: 6px; border-radius: 3px; margin-bottom: 15px;">
                                 <div style="width: {fact_score}%; background-color: {bar_color}; height: 6px; border-radius: 3px;"></div>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # [감정 이모지 & 요약]
                             sentiment_emoji = res.get("sentiment_emoji", "🧐")
-                            
                             st.markdown(f"""
                             <div class='insight-box'>
                                 <b>SUMMARY {sentiment_emoji}</b><br>{res['summary']}<br><br>
@@ -440,151 +449,144 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # [챗봇 Q&A]
                             st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
+                            if article_id not in st.session_state.chat_history: st.session_state.chat_history[article_id] = []
                             
-                            if article_id not in st.session_state.chat_history:
-                                st.session_state.chat_history[article_id] = []
-
                             for chat in st.session_state.chat_history[article_id]:
                                 role_class = "chat-user" if chat["role"] == "user" else "chat-ai"
                                 st.markdown(f"<div class='{role_class}'>{chat['content']}</div>", unsafe_allow_html=True)
 
                             with st.form(key=f"chat_form_{i}", clear_on_submit=True):
-                                col_input, col_btn = st.columns([4, 1])
-                                with col_input:
-                                    user_q = st.text_input("Question", placeholder="Ask about this article...", label_visibility="collapsed")
-                                with col_btn:
-                                    submit_btn = st.form_submit_button("ASK", use_container_width=True)
-                                
-                                if submit_btn and user_q:
-                                    st.session_state.chat_history[article_id].append({"role": "user", "content": user_q})
-                                    with st.spinner("Thinking..."):
-                                        ai_answer = ask_ai_about_news(f"Title: {clean_title}", user_q, region_code)
-                                        st.session_state.chat_history[article_id].append({"role": "ai", "content": ai_answer})
+                                c1, c2 = st.columns([4, 1])
+                                uq = c1.text_input("Q", placeholder="Ask...", label_visibility="collapsed")
+                                if c2.form_submit_button("ASK", use_container_width=True) and uq:
+                                    st.session_state.chat_history[article_id].append({"role": "user", "content": uq})
+                                    with st.spinner("..."):
+                                        ans = ask_ai_about_news(f"Title: {clean_title}", uq, region_code)
+                                        st.session_state.chat_history[article_id].append({"role": "ai", "content": ans})
                                     st.rerun()
-
                     st.link_button("READ FULL ARTICLE", entry.link, use_container_width=True)
 
-# --- [TAB 2] 비교 분석 모드 (Comparison) ---
+# --- TAB 2: Comparison Mode (Enhanced) ---
 with tab2:
-    # 1. 언어별 UI 텍스트 설정
     if region_code == "KR":
         txt = {
-            "info": "💡 주제를 입력하고 '검색'을 누르면 관련 기사를 찾아옵니다. (예: 의대 증원, 금리)",
-            "placeholder": "관심 있는 키워드를 입력하세요...",
-            "search_btn": "검색 (SEARCH) 🔎",
-            "searching": "관련 뉴스를 찾고 있습니다...",
+            "info": "💡 주제를 입력하고 검색하세요. (예: 의대 증원, 트럼프, 금리)",
+            "placeholder": "관심 있는 키워드 입력...",
+            "search_btn": "뉴스 검색 🔎",
+            "compare_btn": "⚖️ 비교 분석 시작 (COMPARE)",
+            "analyzing": "두 기사의 관점을 치열하게 분석 중입니다...",
+            "core_diff": "⚔️ 핵심 대립 포인트",
             "found": "개의 기사를 찾았습니다.",
-            "compare_btn": "선택한 2개 기사 비교하기 (COMPARE)",
-            "analyzing": "두 기사의 관점 차이를 분석 중입니다...",
-            "core_diff": "⚖️ 핵심 차이점 및 쟁점",
-            "stance": "주요 입장",
-            "tone": "어조/태도",
-            "warn_cnt": "⚠️ 비교할 기사를 정확히 2개만 선택해주세요.",
-            "warn_sel": "⚠️ 비교할 기사를 선택해주세요.",
-            "no_result": "검색 결과가 없습니다. 다른 키워드로 검색해보세요."
+            "major": "메이저 언론사"
         }
-    else: # US
+    else:
         txt = {
-            "info": "💡 Enter a topic and click 'Search' to find related articles. (e.g., Bitcoin, AI)",
-            "placeholder": "Type topic to search...",
-            "search_btn": "SEARCH 🔎",
-            "searching": "Searching for news...",
-            "found": "articles found.",
+            "info": "💡 Enter topic to search & compare (e.g., Bitcoin, AI)",
+            "placeholder": "Type keywords...",
+            "search_btn": "Search 🔎",
             "compare_btn": "⚖️ COMPARE SELECTED (2)",
-            "analyzing": "Analyzing differences...",
-            "core_diff": "⚖️ CORE DIFFERENCE",
-            "stance": "Stance",
-            "tone": "Tone",
-            "warn_cnt": "⚠️ Please select exactly 2 articles.",
-            "warn_sel": "⚠️ Please select articles to compare.",
-            "no_result": "No articles found. Try another keyword."
+            "analyzing": "Analyzing conflict...",
+            "core_diff": "⚔️ KEY CONFLICT",
+            "found": "articles found.",
+            "major": "Major Media"
         }
 
     st.info(txt["info"])
     
-    # 2. 검색창 UI
     col_search, col_btn = st.columns([4, 1])
     with col_search:
         search_query = st.text_input("Search Keyword", placeholder=txt["placeholder"], label_visibility="collapsed")
     with col_btn:
-        run_search = st.button(txt["search_btn"], use_container_width=True)
+        run_search = st.button(txt["search_btn"], type="primary", use_container_width=True)
 
-    # 3. 데이터 로직 (검색 & 저장)
-    if "comparison_news" not in st.session_state:
-        st.session_state.comparison_news = []
+    if "comparison_news" not in st.session_state: st.session_state.comparison_news = []
 
     if run_search and search_query:
-        with st.spinner(txt["searching"]):
-            if region_code == "KR":
-                search_url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko"
-            else:
-                search_url = f"https://news.google.com/rss/search?q={search_query}&hl=en-US&gl=US&ceid=US:en"
+        with st.spinner("Searching..."):
+            url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko" if region_code == "KR" else f"https://news.google.com/rss/search?q={search_query}&hl=en-US&gl=US&ceid=US:en"
+            feed = feedparser.parse(url)
             
-            search_feed = feedparser.parse(search_url)
-            st.session_state.comparison_news = search_feed.entries[:10]
+            # 🌟 [로직] 메이저 언론사 우선 정렬
+            all_entries = feed.entries[:20] # 20개 가져옴
+            major_entries = []
+            minor_entries = []
             
-    elif not st.session_state.comparison_news and news:
-        st.session_state.comparison_news = news.entries[:5]
+            for e in all_entries:
+                src = e.title.rsplit(' - ', 1)[1] if ' - ' in e.title else ""
+                if is_major_media(src, region_code):
+                    major_entries.append(e)
+                else:
+                    minor_entries.append(e)
+            
+            # 메이저 먼저 보여주고, 나머지는 뒤에 붙임
+            st.session_state.comparison_news = major_entries + minor_entries
 
-    # 4. 결과 리스트 및 선택 폼
     if st.session_state.comparison_news:
-        if region_code == "KR":
-            st.write(f"결과: {len(st.session_state.comparison_news)}{txt['found']}")
-        else:
-            st.write(f"Results: {len(st.session_state.comparison_news)} {txt['found']}")
+        st.write(f"Results: {len(st.session_state.comparison_news)} {txt['found']}")
         
         with st.form("compare_form"):
             selected_indices = []
-            
             for idx, entry in enumerate(st.session_state.comparison_news):
                 clean_title = entry.title.rsplit(' - ', 1)[0] if ' - ' in entry.title else entry.title
                 source_name = entry.title.rsplit(' - ', 1)[1] if ' - ' in entry.title else "NEWS"
                 
-                if st.checkbox(f"[{source_name}] {clean_title}", key=f"chk_{idx}"):
+                # 메이저 뱃지 표시
+                is_major = is_major_media(source_name, region_code)
+                major_badge_html = f"<span class='major-badge'>⭐ {txt['major']}</span>" if is_major else ""
+                
+                label = f"{major_badge_html} <b>[{source_name}]</b> {clean_title}"
+                if st.checkbox(label, key=f"chk_{idx}", unsafe_allow_html=True): # unsafe_allow_html로 뱃지 렌더링
                     selected_indices.append(entry)
             
             st.markdown("---")
-            submit_compare = st.form_submit_button(txt["compare_btn"], type="primary", use_container_width=True)
-
-            if submit_compare:
+            if st.form_submit_button(txt["compare_btn"], type="primary", use_container_width=True):
                 if len(selected_indices) == 2:
-                    art_a = selected_indices[0]
-                    art_b = selected_indices[1]
+                    art_a, art_b = selected_indices[0], selected_indices[1]
                     
                     with st.spinner(txt["analyzing"]):
-                        comp_res = compare_news_groq(art_a.title, art_b.title, region_code)
-                        
-                        if comp_res:
-                            st.subheader("🔍 Perspective Analysis")
+                        res = compare_news_groq(art_a.title, art_b.title, region_code)
+                        if res:
+                            # 🌟 [Visual] VS 카드 디자인 적용
+                            st.subheader(txt["core_diff"])
+                            st.markdown(f"<div style='font-size:18px; font-weight:bold; margin-bottom:20px;'>{res['core_difference']}</div>", unsafe_allow_html=True)
                             
-                            # 분석 결과 박스
-                            st.markdown(f"""
-                            <div class='insight-box' style='border-left: 4px solid #8e44ad; background-color: #f4ecf7;'>
-                                <b>{txt['core_diff']}</b><br>
-                                {comp_res['core_difference']}
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # 좌우 비교 카드
                             col_a, col_b = st.columns(2)
+                            
+                            # Article A Card (Blue)
                             with col_a:
-                                st.markdown(f"<div class='vs-badge'>ARTICLE A</div>", unsafe_allow_html=True)
-                                st.markdown(f"**{art_a.title}**")
-                                st.markdown(f"{txt['stance']}: **{comp_res['article_a']['stance']}**")
-                                st.caption(f"{txt['tone']}: {comp_res['article_a']['tone']}")
-                                st.link_button("Read Original", art_a.link)
+                                src_a = art_a.title.rsplit(' - ', 1)[1] if ' - ' in art_a.title else "A"
+                                st.markdown(f"""
+                                <div class='vs-card vs-card-a'>
+                                    <div class='vs-label'>ARTICLE A • {src_a}</div>
+                                    <div class='vs-title'>{art_a.title}</div>
+                                    <div class='vs-tag'>{res['article_a']['stance']}</div>
+                                    <div class='vs-tag'>{res['article_a']['tone']}</div>
+                                    <hr style='border-color:rgba(255,255,255,0.3);'>
+                                    <div style='font-size:13px; opacity:0.9;'>{res['article_a']['summary']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.link_button("Read A", art_a.link, use_container_width=True)
+                            
+                            # Article B Card (Red)
                             with col_b:
-                                st.markdown(f"<div class='vs-badge' style='background-color:#7f8c8d;'>ARTICLE B</div>", unsafe_allow_html=True)
-                                st.markdown(f"**{art_b.title}**")
-                                st.markdown(f"{txt['stance']}: **{comp_res['article_b']['stance']}**")
-                                st.caption(f"{txt['tone']}: {comp_res['article_b']['tone']}")
-                                st.link_button("Read Original", art_b.link)
-                                
-                elif len(selected_indices) > 2:
-                    st.warning(txt["warn_cnt"])
+                                src_b = art_b.title.rsplit(' - ', 1)[1] if ' - ' in art_b.title else "B"
+                                st.markdown(f"""
+                                <div class='vs-card vs-card-b'>
+                                    <div class='vs-label'>ARTICLE B • {src_b}</div>
+                                    <div class='vs-title'>{art_b.title}</div>
+                                    <div class='vs-tag'>{res['article_b']['stance']}</div>
+                                    <div class='vs-tag'>{res['article_b']['tone']}</div>
+                                    <hr style='border-color:rgba(255,255,255,0.3);'>
+                                    <div style='font-size:13px; opacity:0.9;'>{res['article_b']['summary']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.link_button("Read B", art_b.link, use_container_width=True)
+
+                            # Key Points Summary
+                            st.markdown("### 📌 Detail Points")
+                            for point in res.get("key_points", []):
+                                st.info(point)
+
                 else:
-                    st.warning(txt["warn_sel"])
-    else:
-        st.write(txt["no_result"])
+                    st.warning("⚠️ 2개의 기사를 선택해주세요. (Select exactly 2 articles)")
