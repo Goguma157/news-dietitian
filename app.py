@@ -7,168 +7,164 @@ import time
 import re
 
 # ==========================================
-# 1. 기본 설정 및 CSS 스타일
+# 1. 기본 설정 및 CSS 스타일 (전문가 모드 적용)
 # ==========================================
-st.set_page_config(page_title="News Dietitian : Global", page_icon="🌎", layout="wide")
+st.set_page_config(page_title="News Dietitian : Analyst Mode", page_icon="📰", layout="wide")
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Roboto:wght@300;400;500;700&display=swap');
+    /* 폰트: 제목은 권위 있는 Merriweather(명조), 본문은 가독성 좋은 Roboto(고딕) */
+    @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300&family=Roboto:wght@300;400;500;700&display=swap');
     
     html, body, [class*="css"] { 
         font-family: 'Roboto', sans-serif !important; 
-        color: #333333;
-        background-color: #fcfcfc;
+        color: #222;
+        background-color: #f9f9f9; /* 눈이 편한 미색 배경 */
     }
     
-    h1, h2, h3 { font-family: 'Merriweather', serif !important; font-weight: 900; color: #2c3e50; }
+    h1, h2, h3 { font-family: 'Merriweather', serif !important; color: #1a1a1a; letter-spacing: -0.5px; }
 
-    /* 탭 스타일 */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    /* --- 탭 스타일 (미니멀리즘) --- */
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
-        white-space: pre-wrap;
-        background-color: #fff;
-        border-radius: 4px;
-        color: #555;
-        font-weight: 600;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        background-color: transparent;
+        border: none;
+        color: #888;
+        font-weight: 500;
+        font-size: 14px;
+        transition: color 0.3s;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #2c3e50;
-        color: #fff;
+        color: #1a1a1a;
+        font-weight: 900;
+        border-bottom: 3px solid #1a1a1a;
     }
 
+    /* --- 카드 컨테이너 (기존 박스 스타일 제거) --- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        border-radius: 0px; /* 각진 모서리로 전문성 강조 */
         padding: 24px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         margin-bottom: 16px;
     }
 
-    /* --- [VS 모드 시각화 스타일] --- */
-    .vs-container {
+    /* --- [NEW] Compare UI: Paper Style --- */
+    .compare-container {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        margin-top: 20px;
-        gap: 20px;
-    }
-    .vs-card {
-        flex: 1;
-        padding: 20px;
-        border-radius: 12px;
-        color: #fff;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    .vs-card-a { background: linear-gradient(135deg, #3498db, #2980b9); } /* 파랑 (A) */
-    .vs-card-b { background: linear-gradient(135deg, #e74c3c, #c0392b); } /* 빨강 (B) */
-    
-    .vs-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; line-height: 1.4; height: 50px; overflow: hidden; }
-    .vs-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 5px; }
-    .vs-tag { 
-        background-color: rgba(255,255,255,0.2); 
-        padding: 4px 8px; 
-        border-radius: 4px; 
-        font-size: 12px; 
-        font-weight: bold; 
-        display: inline-block;
-        margin-top: 10px;
-    }
-    
-    .major-badge {
-        background-color: #f1c40f;
-        color: #333;
-        font-size: 10px;
-        font-weight: 800;
-        padding: 2px 6px;
-        border-radius: 4px;
-        margin-right: 5px;
-        vertical-align: middle;
-    }
-
-    /* --- [기존 라벨 스타일] --- */
-    .label-container {
+        align-items: stretch;
+        background-color: #fff; 
+        padding: 40px;
+        border: 1px solid #e0e0e0;
+        gap: 40px;
         position: relative;
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 4px;
-        color: white;
-        font-weight: 800;
-        font-size: 11px;
-        cursor: help; 
-        margin-right: 5px;
-        transition: transform 0.2s;
-    }
-    .label-container:hover { transform: translateY(-2px); }
-    .fact-based { background-color: #27ae60; } 
-    .mixed { background-color: #f39c12; }      
-    .opinion { background-color: #c0392b; }    
-
-    .tooltip-text {
-        visibility: hidden;
-        width: 220px;
-        background-color: #2c3e50;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 10px;
-        font-size: 11px;
-        font-weight: normal;
-        line-height: 1.4;
-        position: absolute;
-        bottom: 135%; 
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 999; 
-        opacity: 0;
-        transition: opacity 0.3s, bottom 0.3s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
-    }
-    .tooltip-text::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #2c3e50 transparent transparent transparent;
-    }
-    .label-container:hover .tooltip-text {
-        visibility: visible;
-        opacity: 1;
-        bottom: 125%; 
+        margin-bottom: 30px;
     }
 
-    .hashtag {
-        background-color: #f0f2f6;
-        color: #555;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-        margin-right: 4px;
-        display: inline-block;
+    .paper-card {
+        flex: 1;
+        background: transparent;
+    }
+
+    .news-meta {
+        font-family: 'Roboto', sans-serif;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #999;
+        margin-bottom: 15px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
     }
     
-    .badge-source { background-color: #ecf0f1; color: #7f8c8d; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; border-radius: 2px; margin-right: 6px; }
+    .news-title {
+        font-family: 'Merriweather', serif;
+        font-size: 24px;
+        font-weight: 900;
+        color: #111;
+        line-height: 1.4;
+        margin-bottom: 25px;
+        border-bottom: 3px solid #111; /* 제목 아래 굵은 선 포인트 */
+        padding-bottom: 20px;
+    }
+
+    .news-summary {
+        font-family: 'Merriweather', serif;
+        font-size: 15px;
+        line-height: 1.8;
+        color: #444;
+        font-weight: 300;
+    }
+
+    .stat-box {
+        margin-top: 25px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #666;
+        font-family: 'Roboto', sans-serif;
+    }
+
+    /* --- 중앙 구분선 --- */
+    .divider-vertical {
+        width: 1px;
+        background-color: #e0e0e0;
+        position: relative;
+    }
+    
+    .vs-badge-minimal {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #fff;
+        color: #bbb;
+        border: 1px solid #e0e0e0;
+        padding: 6px 8px;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* --- 기타 유틸리티 --- */
+    .badge-source { 
+        background-color: #f4f4f4; 
+        color: #555; 
+        padding: 4px 8px; 
+        font-size: 10px; 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        border-radius: 2px; 
+        margin-right: 6px; 
+        border: 1px solid #ddd;
+    }
 
     .insight-box {
         background-color: #f9f9f9;
-        border-left: 4px solid #34495e;
+        border-left: 3px solid #2c3e50;
         padding: 15px 20px;
         font-family: 'Merriweather', serif;
         font-size: 14px;
         line-height: 1.6;
-        color: #2c3e50;
+        color: #333;
         margin-top: 15px;
     }
     
-    .chat-user { text-align: right; margin: 8px 0; color: #555; font-size: 13px; font-style: italic; }
-    .chat-ai { text-align: left; margin: 8px 0; font-weight: 600; color: #2c3e50; font-size: 13px; }
+    .chat-user { text-align: right; margin: 8px 0; color: #666; font-size: 13px; font-style: italic; }
+    .chat-ai { text-align: left; margin: 8px 0; font-weight: 600; color: #111; font-size: 13px; font-family: 'Merriweather', serif; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -180,7 +176,6 @@ MAJOR_US = ["CNN", "Fox News", "New York Times", "Washington Post", "Reuters", "
 
 def is_major_media(source_name, region_code):
     target_list = MAJOR_KR if region_code == "KR" else MAJOR_US
-    # 대소문자 무시하고 포함 여부 확인
     return any(m.lower() in source_name.lower() for m in target_list)
 
 # ==========================================
@@ -215,7 +210,7 @@ def safe_parse_json(raw_text):
 def analyze_news_groq(news_text, region_code):
     
     if region_code == "KR":
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja)."
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY."
     else:
         lang_instruction = "Answer strictly in English."
     
@@ -265,7 +260,6 @@ def analyze_news_groq(news_text, region_code):
     except:
         return None
 
-# 🌟 [업데이트] AI 분석 함수 (성향 점수 요청 추가)
 @st.cache_data(show_spinner=False)
 def compare_news_groq(text_a, text_b, region_code):
     if region_code == "KR":
@@ -342,7 +336,7 @@ def ask_ai_about_news(news_context, user_question, region_code):
 # ==========================================
 # 5. UI Layout
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: #2c3e50;'>NEWS<br>DIETITIAN</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: #2c3e50; font-family:Merriweather;'>NEWS<br>DIETITIAN</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 region = st.sidebar.selectbox("REGION / EDITION", ("🇰🇷 Korea (KR)", "🇺🇸 USA (US)"), index=1)
@@ -368,7 +362,7 @@ else:
     }
 
 category = st.sidebar.radio("TOPICS", list(rss_categories.keys()))
-st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 10px;'>{category} <span style='font-size:18px; color:#666;'>({region_code})</span></h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='border-bottom: 2px solid #2c3e50; padding-bottom: 15px; margin-bottom: 30px;'>{category} <span style='font-size:18px; color:#888; font-weight:400;'>| {region_code} Edition</span></h1>", unsafe_allow_html=True)
 
 try:
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -381,7 +375,7 @@ except:
 # ==========================================
 # 6. TABS (Feed / Comparison)
 # ==========================================
-tab1, tab2 = st.tabs(["📰 Daily Feed", "⚖️ Comparison Mode"])
+tab1, tab2 = st.tabs(["📰 Daily Briefing", "⚖️ Analyst Compare"])
 
 # --- TAB 1: Daily Feed ---
 with tab1:
@@ -397,15 +391,15 @@ with tab1:
                         clean_title = entry.title
                         source_name = "NEWS"
                     
-                    st.markdown(f"<span class='badge-source'>{source_name}</span> <span style='color:#999; font-size:11px;'>{entry.published[:16]}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<h3 style='margin-top: 8px; font-size: 20px; line-height: 1.4; margin-bottom: 15px;'>{clean_title}</h3>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='badge-source'>{source_name}</span> <span style='color:#bbb; font-size:11px;'>{entry.published[:16]}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<h3 style='margin-top: 10px; font-size: 20px; line-height: 1.4; margin-bottom: 20px;'>{clean_title}</h3>", unsafe_allow_html=True)
                     
                     article_id = entry.link
                     view_key = f"view_{article_id}"
                     if view_key not in st.session_state: st.session_state[view_key] = False
 
                     if st.session_state[view_key]:
-                        btn_label = "CLOSE ✕"
+                        btn_label = "CLOSE REPORT"
                         btn_type = "secondary"
                     else:
                         btn_label = "ANALYZE BIAS"
@@ -414,7 +408,7 @@ with tab1:
                     if st.button(btn_label, key=f"btn_{i}", type=btn_type, use_container_width=True):
                         st.session_state[view_key] = not st.session_state[view_key]
                         if st.session_state[view_key] and f"analysis_{article_id}" not in st.session_state:
-                            with st.spinner("Analyzing..."):
+                            with st.spinner("Processing Analyst Report..."):
                                 res = analyze_news_groq(f"Title: {clean_title}\nContent: {entry.title}", region_code)
                                 st.session_state[f"analysis_{article_id}"] = res
                         st.rerun()
@@ -423,39 +417,29 @@ with tab1:
                         res = st.session_state[f"analysis_{article_id}"]
                         if res:
                             st.markdown("---")
+                            # Keywords
                             if "keywords" in res and res["keywords"]:
-                                tags_html = "".join([f"<span class='hashtag'>#{tag}</span>" for tag in res["keywords"]])
-                                st.markdown(f"<div style='margin-bottom:10px;'>{tags_html}</div>", unsafe_allow_html=True)
+                                tags_html = "".join([f"<span style='background:#f0f0f0; padding:2px 6px; font-size:11px; margin-right:4px; color:#666;'>#{tag}</span>" for tag in res["keywords"]])
+                                st.markdown(f"<div style='margin-bottom:15px;'>{tags_html}</div>", unsafe_allow_html=True)
 
+                            # Fact Score Bar
                             fact_score = res['scores'].get('fact_ratio', 50)
-                            if fact_score >= 80:
-                                badge_class, label_text, bar_color = "fact-based", "FACT-BASED", "#27ae60"
-                                tooltip_desc = "작성자의 의견을 배제하고,<br>검증된 사실과 데이터만 담았습니다." if region_code == "KR" else "Strictly based on facts and data,<br>without personal opinion."
-                            elif fact_score >= 50:
-                                badge_class, label_text, bar_color = "mixed", "MIXED", "#f39c12"
-                                tooltip_desc = "사실적인 정보에 작성자의<br>개인적인 해석이나 견해가 섞여 있습니다." if region_code == "KR" else "Factual information mixed with<br>personal interpretation or opinion."
-                            else:
-                                badge_class, label_text, bar_color = "opinion", "OPINION", "#c0392b"
-                                tooltip_desc = "작성자의 주관적인 주장이나<br>감정적 호소가 주를 이룹니다." if region_code == "KR" else "Primarily consists of subjective arguments<br>or emotional appeals."
-                            
+                            st.caption(f"FACTUALITY INDEX: {fact_score}/100")
                             st.markdown(f"""
-                            <div style='margin-top: 5px; margin-bottom: 5px;'>
-                                <span class='label-container {badge_class}'>{label_text}<span class='tooltip-text'>{tooltip_desc}</span></span>
-                            </div>
-                            <div style="width: 100%; background-color: #eee; height: 6px; border-radius: 3px; margin-bottom: 15px;">
-                                <div style="width: {fact_score}%; background-color: {bar_color}; height: 6px; border-radius: 3px;"></div>
+                            <div style="width: 100%; background-color: #eee; height: 4px; margin-bottom: 15px;">
+                                <div style="width: {fact_score}%; background-color: #2c3e50; height: 4px;"></div>
                             </div>
                             """, unsafe_allow_html=True)
 
                             sentiment_emoji = res.get("sentiment_emoji", "🧐")
                             st.markdown(f"""
                             <div class='insight-box'>
-                                <b>SUMMARY {sentiment_emoji}</b><br>{res['summary']}<br><br>
+                                <b>EXECUTIVE SUMMARY {sentiment_emoji}</b><br>{res['summary']}<br><br>
                                 <b>CONTEXT & BIAS</b><br>{res['balance']['hidden']}
                             </div>
                             """, unsafe_allow_html=True)
 
-                            st.markdown("<div style='margin-top:20px; font-size:12px; font-weight:700; color:#95a5a6;'>ASK THE ANALYST</div>", unsafe_allow_html=True)
+                            st.markdown("<div style='margin-top:20px; font-size:11px; font-weight:700; color:#ccc; letter-spacing:1px;'>INTERACTIVE Q&A</div>", unsafe_allow_html=True)
                             if article_id not in st.session_state.chat_history: st.session_state.chat_history[article_id] = []
                             
                             for chat in st.session_state.chat_history[article_id]:
@@ -464,96 +448,36 @@ with tab1:
 
                             with st.form(key=f"chat_form_{i}", clear_on_submit=True):
                                 c1, c2 = st.columns([4, 1])
-                                uq = c1.text_input("Q", placeholder="Ask...", label_visibility="collapsed")
+                                uq = c1.text_input("Q", placeholder="Inquire about this article...", label_visibility="collapsed")
                                 if c2.form_submit_button("ASK", use_container_width=True) and uq:
                                     st.session_state.chat_history[article_id].append({"role": "user", "content": uq})
-                                    with st.spinner("..."):
+                                    with st.spinner("Analyst is typing..."):
                                         ans = ask_ai_about_news(f"Title: {clean_title}", uq, region_code)
                                         st.session_state.chat_history[article_id].append({"role": "ai", "content": ans})
                                     st.rerun()
-                    st.link_button("READ FULL ARTICLE", entry.link, use_container_width=True)
+                    st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Visual Spectrum Added) ---
+# --- TAB 2: Comparison Mode (Professional UI Updated) ---
 with tab2:
-    # 스타일 추가 (스펙트럼 바 전용)
-    st.markdown("""
-    <style>
-        .spectrum-container {
-            position: relative;
-            width: 100%;
-            height: 60px;
-            background: linear-gradient(90deg, #3498db 0%, #ecf0f1 50%, #e74c3c 100%);
-            border-radius: 30px;
-            margin: 20px 0 40px 0;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .center-line {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background-color: rgba(0,0,0,0.1);
-            border-right: 1px dashed #999;
-        }
-        .marker {
-            position: absolute;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            z-index: 10;
-            transition: left 0.5s ease-out;
-        }
-        .marker-a { background-color: #2980b9; } /* Blue for A */
-        .marker-b { background-color: #c0392b; } /* Red for B */
-        
-        .marker-label {
-            position: absolute;
-            top: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #333;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            white-space: nowrap;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
     if region_code == "KR":
         txt = {
-            "info": "💡 주제를 입력하고 검색하세요. (예: 의대 증원, 트럼프, 금리)",
-            "placeholder": "관심 있는 키워드 입력...",
-            "search_btn": "뉴스 검색 🔎",
-            "compare_btn": "⚖️ 비교 분석 시작 (COMPARE)",
-            "analyzing": "두 기사의 관점을 치열하게 분석 중입니다...",
-            "core_diff": "⚔️ 핵심 대립 포인트",
-            "found": "개의 기사를 찾았습니다.",
-            "major": "메이저",
-            "visual_title": "📊 성향 스펙트럼 (Stance Spectrum)"
+            "info": "💡 비교할 주제를 입력하세요. (예: 금리 인상, 선거, 부동산 정책)",
+            "placeholder": "키워드 입력...",
+            "search_btn": "검색 (SEARCH)",
+            "compare_btn": "선택한 2개 기사 비교 분석 (RUN COMPARISON)",
+            "analyzing": "심층 비교 분석 보고서를 작성 중입니다...",
+            "found": "개의 관련 기사 검색됨",
+            "major": "Major"
         }
     else:
         txt = {
-            "info": "💡 Enter topic to search & compare (e.g., Bitcoin, AI)",
-            "placeholder": "Type keywords...",
-            "search_btn": "Search 🔎",
-            "compare_btn": "⚖️ COMPARE SELECTED (2)",
-            "analyzing": "Analyzing conflict...",
-            "core_diff": "⚔️ KEY CONFLICT",
+            "info": "💡 Enter topic to compare perspectives (e.g., Fed Rates, Elections)",
+            "placeholder": "Enter Keyword...",
+            "search_btn": "SEARCH",
+            "compare_btn": "RUN COMPARISON (Select 2)",
+            "analyzing": "Generating Comparative Analyst Report...",
             "found": "articles found.",
-            "major": "MAJOR",
-            "visual_title": "📊 Stance Spectrum"
+            "major": "Major"
         }
 
     st.info(txt["info"])
@@ -567,7 +491,7 @@ with tab2:
     if "comparison_news" not in st.session_state: st.session_state.comparison_news = []
 
     if run_search and search_query:
-        with st.spinner("Searching..."):
+        with st.spinner("Accessing Wire Services..."):
             url = f"https://news.google.com/rss/search?q={search_query}&hl=ko&gl=KR&ceid=KR:ko" if region_code == "KR" else f"https://news.google.com/rss/search?q={search_query}&hl=en-US&gl=US&ceid=US:en"
             feed = feedparser.parse(url)
             
@@ -585,7 +509,7 @@ with tab2:
             st.session_state.comparison_news = major_entries + minor_entries
 
     if st.session_state.comparison_news:
-        st.write(f"Results: {len(st.session_state.comparison_news)} {txt['found']}")
+        st.write(f"Query Results: {len(st.session_state.comparison_news)} {txt['found']}")
         
         with st.form("compare_form"):
             selected_indices = []
@@ -594,10 +518,8 @@ with tab2:
                 source_name = entry.title.rsplit(' - ', 1)[1] if ' - ' in entry.title else "NEWS"
                 
                 is_major = is_major_media(source_name, region_code)
-                if is_major:
-                    label = f"⭐ **[{source_name}]** {clean_title}"
-                else:
-                    label = f"[{source_name}] {clean_title}"
+                label_prefix = "⭐ " if is_major else ""
+                label = f"{label_prefix}**[{source_name}]** {clean_title}"
                 
                 if st.checkbox(label, key=f"chk_{idx}"): 
                     selected_indices.append(entry)
@@ -610,77 +532,99 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 1. 핵심 차이 요약
-                            st.subheader(txt["core_diff"])
-                            st.markdown(f"<div style='font-size:18px; font-weight:bold; margin-bottom:20px;'>{res['core_difference']}</div>", unsafe_allow_html=True)
-                            
-                            # 2. [NEW] 성향 스펙트럼 시각화 (Balance Scale) 
-                            st.markdown(f"#### {txt['visual_title']}")
-                            
-                            # 점수 계산 (-10~10 -> 0~100%)
-                            score_a = res['article_a'].get('stance_score', 0)
-                            score_b = res['article_b'].get('stance_score', 0)
-                            
-                            pos_a = (score_a + 10) * 5  # 예: -10 -> 0%, 0 -> 50%, 10 -> 100%
-                            pos_b = (score_b + 10) * 5
-                            
-                            # HTML로 저울(Bar) 그리기
+                            # 1. 핵심 차이 (리포트 제목처럼)
                             st.markdown(f"""
-                            <div class="spectrum-container">
-                                <div class="center-line"></div>
-                                <div class="marker marker-a" style="left: {pos_a}%;">
-                                    A
-                                    <div class="marker-label">Article A</div>
-                                </div>
-                                <div class="marker marker-b" style="left: {pos_b}%;">
-                                    B
-                                    <div class="marker-label">Article B</div>
+                            <div style="text-align: center; margin-bottom: 40px; padding: 20px;">
+                                <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; font-weight:700;">Comparative Analysis Report</div>
+                                <div style="font-family: 'Merriweather', serif; font-size: 28px; font-weight: 900; color: #111; line-height:1.3;">
+                                    "{res['core_difference']}"
                                 </div>
                             </div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; color:#666; margin-top:-30px; margin-bottom:30px;">
-                                <span>◀ Critical / Negative</span>
-                                <span>Neutral</span>
-                                <span>Supportive / Positive ▶</span>
+                            """, unsafe_allow_html=True)
+                            
+                            # 2. Paper Style 비교 UI (전문가 느낌)
+                            score_a = res['article_a'].get('stance_score', 0)
+                            score_b = res['article_b'].get('stance_score', 0)
+                            src_a = art_a.title.rsplit(' - ', 1)[1] if ' - ' in art_a.title else "Source A"
+                            src_b = art_b.title.rsplit(' - ', 1)[1] if ' - ' in art_b.title else "Source B"
+                            
+                            st.markdown(f"""
+                            <div class="compare-container">
+                                <div class="paper-card">
+                                    <div class="news-meta">
+                                        <span style="color: #2c3e50;">● ARTICLE A</span>
+                                        <span style="margin: 0 10px; color: #ddd;">|</span>
+                                        {src_a}
+                                    </div>
+                                    <div class="news-title">{art_a.title}</div>
+                                    <div class="news-summary">
+                                        {res['article_a']['summary']}
+                                    </div>
+                                    <div class="stat-box">
+                                        <span>STANCE: <b>{res['article_a']['stance_label']}</b></span>
+                                        <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 2px; font-weight:bold;">Score: {score_a}</span>
+                                    </div>
+                                </div>
+
+                                <div class="divider-vertical">
+                                    <div class="vs-badge-minimal">VS</div>
+                                </div>
+
+                                <div class="paper-card">
+                                    <div class="news-meta">
+                                        <span style="color: #c0392b;">● ARTICLE B</span>
+                                        <span style="margin: 0 10px; color: #ddd;">|</span>
+                                        {src_b}
+                                    </div>
+                                    <div class="news-title" style="border-bottom-color: #c0392b;">{art_b.title}</div>
+                                    <div class="news-summary">
+                                        {res['article_b']['summary']}
+                                    </div>
+                                    <div class="stat-box">
+                                        <span>STANCE: <b>{res['article_b']['stance_label']}</b></span>
+                                        <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 2px; font-weight:bold;">Score: {score_b}</span>
+                                    </div>
+                                </div>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # 3. 상세 비교 카드
-                            col_a, col_b = st.columns(2)
-                            
-                            # Article A
-                            with col_a:
-                                src_a = art_a.title.rsplit(' - ', 1)[1] if ' - ' in art_a.title else "A"
-                                st.markdown(f"""
-                                <div class='vs-card vs-card-a'>
-                                    <div class='vs-label'>ARTICLE A • {src_a}</div>
-                                    <div class='vs-title'>{art_a.title}</div>
-                                    <div class='vs-tag'>Stance Score: {score_a}</div>
-                                    <div class='vs-tag'>{res['article_a']['stance_label']}</div>
-                                    <hr style='border-color:rgba(255,255,255,0.3);'>
-                                    <div style='font-size:13px; opacity:0.9;'>{res['article_a']['summary']}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                st.link_button("Read A", art_a.link, use_container_width=True)
-                            
-                            # Article B
-                            with col_b:
-                                src_b = art_b.title.rsplit(' - ', 1)[1] if ' - ' in art_b.title else "B"
-                                st.markdown(f"""
-                                <div class='vs-card vs-card-b'>
-                                    <div class='vs-label'>ARTICLE B • {src_b}</div>
-                                    <div class='vs-title'>{art_b.title}</div>
-                                    <div class='vs-tag'>Stance Score: {score_b}</div>
-                                    <div class='vs-tag'>{res['article_b']['stance_label']}</div>
-                                    <hr style='border-color:rgba(255,255,255,0.3);'>
-                                    <div style='font-size:13px; opacity:0.9;'>{res['article_b']['summary']}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                st.link_button("Read B", art_b.link, use_container_width=True)
+                            # 링크 버튼
+                            c1, c2, c3 = st.columns([1, 0.1, 1])
+                            c1.link_button(f"Read Full Article (A)", art_a.link, use_container_width=True)
+                            c3.link_button(f"Read Full Article (B)", art_b.link, use_container_width=True)
 
-                            # Key Points
-                            st.markdown("### 📌 Detail Points")
+                            # 3. 성향 스펙트럼 (전문적인 얇은 선 디자인)
+                            st.markdown("<br><br>", unsafe_allow_html=True)
+                            st.caption("POLITICAL COMPASS / STANCE SPECTRUM")
+                            
+                            pos_a = (score_a + 10) * 5 
+                            pos_b = (score_b + 10) * 5
+                            
+                            st.markdown(f"""
+                            <div style="position: relative; height: 50px; margin-top: 20px; width: 100%;">
+                                <div style="position: absolute; top: 50%; width: 100%; height: 1px; background: #bbb;"></div>
+                                <div style="position: absolute; top: 35%; left: 50%; width: 1px; height: 15px; background: #999;"></div> <div style="position: absolute; left: {pos_a}%; top: 50%; transform: translate(-50%, -50%); transition: left 1s;">
+                                    <div style="width: 14px; height: 14px; background: #2c3e50; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+                                    <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: #2c3e50;">A</div>
+                                </div>
+                                
+                                <div style="position: absolute; left: {pos_b}%; top: 50%; transform: translate(-50%, -50%); transition: left 1s;">
+                                    <div style="width: 14px; height: 14px; background: #c0392b; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+                                    <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: #c0392b;">B</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #888; font-weight:500; margin-top: 5px;">
+                                <span>◀ CRITICAL / LEFT (-10)</span>
+                                <span>NEUTRAL (0)</span>
+                                <span>SUPPORTIVE / RIGHT (+10) ▶</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # 4. Key Points (분석 노트)
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.markdown("### 📌 Analytic Notes")
                             for point in res.get("key_points", []):
-                                st.info(point)
+                                st.markdown(f"<div style='margin-bottom:8px; color:#444;'>• {point}</div>", unsafe_allow_html=True)
 
                 else:
-                    st.warning("⚠️ 2개의 기사를 선택해주세요. (Select exactly 2 articles)")
+                    st.warning("⚠️ 정확히 2개의 기사를 선택해주세요. (Please select exactly 2 articles)")
