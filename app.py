@@ -9,7 +9,7 @@ import html
 import textwrap
 
 # ==========================================
-# 1. 기본 설정 및 CSS 스타일 (전문가 모드 + Deep Dive 스타일 추가)
+# 1. 기본 설정 및 CSS 스타일 (전문가 모드 + Deep Dive 스타일)
 # ==========================================
 st.set_page_config(page_title="News Dietitian : Analyst Mode", page_icon="📰", layout="wide")
 
@@ -43,7 +43,7 @@ st.markdown("""
         border-bottom: 3px solid #1a1a1a;
     }
 
-    /* --- 기본 카드 컨테이너 --- */
+    /* --- 카드 컨테이너 --- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
@@ -74,11 +74,11 @@ st.markdown("""
         border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
     }
 
-    /* --- [NEW] Deep Dive UI (전문가 메모 스타일) --- */
+    /* --- [Deep Dive UI] 전문가 메모 스타일 --- */
     .deep-dive-box {
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
-        border-left: 4px solid #34495e; /* 포인트 컬러 (차분한 네이비) */
+        border-left: 4px solid #34495e; 
         padding: 20px;
         margin-top: 10px;
         font-family: 'Roboto', sans-serif;
@@ -102,7 +102,6 @@ st.markdown("""
         margin-bottom: 20px;
         font-weight: 400;
     }
-    .deep-dive-content:last-child { margin-bottom: 0; }
     
     /* --- 유틸리티 --- */
     .badge-source { 
@@ -161,14 +160,14 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 4. AI 분석 로직 (한자 금지 명령 추가)
+# 4. AI 분석 로직 (한자 제거 강화)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
     
     if region_code == "KR":
-        # [수정] 한자 금지 및 한글 사용 강제 명령 강화
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja) under any circumstances. Translate any Hanja terms to Hangul immediately."
+        # [수정] 한자 절대 금지 명령 추가
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. NEVER use Chinese characters (Hanja). If a word has a Hanja equivalent (e.g. 全面), translate it to Hangul (e.g. 전면)."
     else:
         lang_instruction = "Answer strictly in English."
     
@@ -226,8 +225,7 @@ def analyze_news_groq(news_text, region_code):
 @st.cache_data(show_spinner=False)
 def compare_news_groq(text_a, text_b, region_code):
     if region_code == "KR":
-        # [수정] 한자 금지 명령 강화
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Hanja."
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. NEVER use Hanja."
         target_lang = "Korean"
     else:
         lang_instruction = "Answer strictly in English."
@@ -341,7 +339,7 @@ except:
 # ==========================================
 tab1, tab2 = st.tabs(["📰 Daily Briefing", "⚖️ Analyst Compare"])
 
-# --- TAB 1: Daily Feed (Updated Deep Dive UI) ---
+# --- TAB 1: Daily Feed (Deep Dive UI Fix Applied) ---
 with tab1:
     if news and news.entries:
         cols = st.columns(2)
@@ -403,12 +401,12 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # [UPDATE] 더 알아보기 (Deep Dive) - 전문적인 UI로 교체
+                            # [UPDATE] Deep Dive UI (줄바꿈 제거 트릭 적용)
                             st.markdown("<br>", unsafe_allow_html=True)
                             with st.expander("🔍 DEEP DIVE (Context & Facts)"):
                                 deep_dive = res.get("deep_dive", {})
                                 
-                                # 전문적인 'Memo' 스타일로 디자인 적용
+                                # HTML을 한 덩어리로 만든 후 줄바꿈 제거
                                 html_content = f"""
                                 <div class="deep-dive-box">
                                     <div class="deep-dive-header">📖 Context & Background</div>
@@ -430,7 +428,7 @@ with tab1:
                                     </div>
                                 </div>
                                 """
-                                st.markdown(html_content, unsafe_allow_html=True)
+                                st.markdown(html_content.replace("\n", ""), unsafe_allow_html=True)
 
                             st.markdown("<div style='margin-top:20px; font-size:11px; font-weight:700; color:#ccc; letter-spacing:1px;'>INTERACTIVE Q&A</div>", unsafe_allow_html=True)
                             if article_id not in st.session_state.chat_history: st.session_state.chat_history[article_id] = []
@@ -450,7 +448,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Fixed HTML Rendering) ---
+# --- TAB 2: Comparison Mode (HTML Fix Applied) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -525,9 +523,7 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 1. 핵심 차이
                             core_diff_safe = html.escape(res['core_difference'])
-                            
                             st.markdown(f"""
                             <div style="text-align: center; margin-bottom: 40px; padding: 20px;">
                                 <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; font-weight:700;">Comparative Analysis Report</div>
@@ -537,7 +533,6 @@ with tab2:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # 2. Paper Style 비교 UI
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
                             
@@ -591,12 +586,10 @@ with tab2:
                             """
                             st.markdown(html_content.replace("\n", ""), unsafe_allow_html=True)
 
-                            # 링크 버튼
                             c1, c2, c3 = st.columns([1, 0.1, 1])
                             c1.link_button(f"Read Full Article (A)", art_a.link, use_container_width=True)
                             c3.link_button(f"Read Full Article (B)", art_b.link, use_container_width=True)
 
-                            # 3. 성향 스펙트럼
                             st.markdown("<br><br>", unsafe_allow_html=True)
                             st.caption("POLITICAL COMPASS / STANCE SPECTRUM")
                             
@@ -626,7 +619,6 @@ with tab2:
                             """
                             st.markdown(spectrum_html.replace("\n", ""), unsafe_allow_html=True)
 
-                            # 4. Key Points
                             st.markdown("<br>", unsafe_allow_html=True)
                             st.markdown("### 📌 Analytic Notes")
                             for point in res.get("key_points", []):
