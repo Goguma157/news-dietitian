@@ -459,7 +459,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Indentation Fix Applied) ---
+# --- TAB 2: Comparison Mode (Final Fix for HTML Rendering) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -534,22 +534,23 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 1. 핵심 차이 (들여쓰기 문제 해결)
+                            # 1. 핵심 차이
                             core_diff_safe = html.escape(res['core_difference'])
                             
-                            st.markdown(textwrap.dedent(f"""
+                            st.markdown(f"""
                             <div style="text-align: center; margin-bottom: 40px; padding: 20px;">
                                 <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; font-weight:700;">Comparative Analysis Report</div>
                                 <div style="font-family: 'Merriweather', serif; font-size: 28px; font-weight: 900; color: #111; line-height:1.3;">
                                     "{core_diff_safe}"
                                 </div>
                             </div>
-                            """), unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
                             
-                            # 2. Paper Style 비교 UI (들여쓰기 문제 해결)
+                            # 2. Paper Style 비교 UI (HTML 생성 후 공백 제거 트릭 적용)
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
                             
+                            # 데이터 안전 변환
                             src_a = html.escape(art_a.title.rsplit(' - ', 1)[1]) if ' - ' in art_a.title else "Source A"
                             src_b = html.escape(art_b.title.rsplit(' - ', 1)[1]) if ' - ' in art_b.title else "Source B"
                             title_a = html.escape(art_a.title)
@@ -559,8 +560,10 @@ with tab2:
                             label_a = html.escape(res['article_a']['stance_label'])
                             label_b = html.escape(res['article_b']['stance_label'])
                             
-                            # textwrap.dedent()로 HTML 앞 공백 제거 -> 코드 블록 인식 방지
-                            st.markdown(textwrap.dedent(f"""
+                            # [핵심 수정] HTML을 하나의 긴 문자열로 만들고, .replace('\n', '')로 줄바꿈을 모두 없앱니다.
+                            # 이렇게 하면 Markdown 파서가 '코드 블록'으로 인식할 여지가 아예 사라집니다.
+                            
+                            html_content = f"""
                             <div class="compare-container">
                                 <div class="paper-card">
                                     <div class="news-meta">
@@ -598,21 +601,25 @@ with tab2:
                                     </div>
                                 </div>
                             </div>
-                            """), unsafe_allow_html=True)
+                            """
+                            
+                            # 🔥 줄바꿈을 공백으로 치환하여 코드 블록 인식 방지 (The Fix)
+                            st.markdown(html_content.replace("\n", ""), unsafe_allow_html=True)
+
 
                             # 링크 버튼
                             c1, c2, c3 = st.columns([1, 0.1, 1])
                             c1.link_button(f"Read Full Article (A)", art_a.link, use_container_width=True)
                             c3.link_button(f"Read Full Article (B)", art_b.link, use_container_width=True)
 
-                            # 3. 성향 스펙트럼 (들여쓰기 문제 해결)
+                            # 3. 성향 스펙트럼
                             st.markdown("<br><br>", unsafe_allow_html=True)
                             st.caption("POLITICAL COMPASS / STANCE SPECTRUM")
                             
                             pos_a = (score_a + 10) * 5 
                             pos_b = (score_b + 10) * 5
                             
-                            st.markdown(textwrap.dedent(f"""
+                            spectrum_html = f"""
                             <div style="position: relative; height: 50px; margin-top: 20px; width: 100%;">
                                 <div style="position: absolute; top: 50%; width: 100%; height: 1px; background: #bbb;"></div>
                                 <div style="position: absolute; top: 35%; left: 50%; width: 1px; height: 15px; background: #999;"></div>
@@ -632,7 +639,9 @@ with tab2:
                                 <span>NEUTRAL (0)</span>
                                 <span>SUPPORTIVE / RIGHT (+10) ▶</span>
                             </div>
-                            """), unsafe_allow_html=True)
+                            """
+                            # 여기도 안전하게 줄바꿈 제거 적용
+                            st.markdown(spectrum_html.replace("\n", ""), unsafe_allow_html=True)
 
                             # 4. Key Points
                             st.markdown("<br>", unsafe_allow_html=True)
