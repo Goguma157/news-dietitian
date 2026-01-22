@@ -6,6 +6,7 @@ import requests
 import time
 import re
 import html
+import textwrap  # <--- 이 줄을 꼭 추가해주세요! (들여쓰기 제거용)
 
 # ==========================================
 # 1. 기본 설정 및 CSS 스타일 (전문가 모드 적용)
@@ -458,7 +459,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Professional UI Updated + HTML Fix) ---
+# --- TAB 2: Comparison Mode (Indentation Fix Applied) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -533,23 +534,22 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 1. 핵심 차이 (리포트 제목) - HTML 특수문자 변환 적용
+                            # 1. 핵심 차이 (들여쓰기 문제 해결)
                             core_diff_safe = html.escape(res['core_difference'])
                             
-                            st.markdown(f"""
+                            st.markdown(textwrap.dedent(f"""
                             <div style="text-align: center; margin-bottom: 40px; padding: 20px;">
                                 <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; font-weight:700;">Comparative Analysis Report</div>
                                 <div style="font-family: 'Merriweather', serif; font-size: 28px; font-weight: 900; color: #111; line-height:1.3;">
                                     "{core_diff_safe}"
                                 </div>
                             </div>
-                            """, unsafe_allow_html=True)
+                            """), unsafe_allow_html=True)
                             
-                            # 2. Paper Style 비교 UI (전문가 느낌)
+                            # 2. Paper Style 비교 UI (들여쓰기 문제 해결)
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
                             
-                            # 데이터 안전하게 변환 (HTML 깨짐 방지)
                             src_a = html.escape(art_a.title.rsplit(' - ', 1)[1]) if ' - ' in art_a.title else "Source A"
                             src_b = html.escape(art_b.title.rsplit(' - ', 1)[1]) if ' - ' in art_b.title else "Source B"
                             title_a = html.escape(art_a.title)
@@ -559,7 +559,8 @@ with tab2:
                             label_a = html.escape(res['article_a']['stance_label'])
                             label_b = html.escape(res['article_b']['stance_label'])
                             
-                            st.markdown(f"""
+                            # textwrap.dedent()로 HTML 앞 공백 제거 -> 코드 블록 인식 방지
+                            st.markdown(textwrap.dedent(f"""
                             <div class="compare-container">
                                 <div class="paper-card">
                                     <div class="news-meta">
@@ -597,21 +598,21 @@ with tab2:
                                     </div>
                                 </div>
                             </div>
-                            """, unsafe_allow_html=True)
+                            """), unsafe_allow_html=True)
 
                             # 링크 버튼
                             c1, c2, c3 = st.columns([1, 0.1, 1])
                             c1.link_button(f"Read Full Article (A)", art_a.link, use_container_width=True)
                             c3.link_button(f"Read Full Article (B)", art_b.link, use_container_width=True)
 
-                            # 3. 성향 스펙트럼 (전문적인 얇은 선 디자인)
+                            # 3. 성향 스펙트럼 (들여쓰기 문제 해결)
                             st.markdown("<br><br>", unsafe_allow_html=True)
                             st.caption("POLITICAL COMPASS / STANCE SPECTRUM")
                             
                             pos_a = (score_a + 10) * 5 
                             pos_b = (score_b + 10) * 5
                             
-                            st.markdown(f"""
+                            st.markdown(textwrap.dedent(f"""
                             <div style="position: relative; height: 50px; margin-top: 20px; width: 100%;">
                                 <div style="position: absolute; top: 50%; width: 100%; height: 1px; background: #bbb;"></div>
                                 <div style="position: absolute; top: 35%; left: 50%; width: 1px; height: 15px; background: #999;"></div>
@@ -631,9 +632,9 @@ with tab2:
                                 <span>NEUTRAL (0)</span>
                                 <span>SUPPORTIVE / RIGHT (+10) ▶</span>
                             </div>
-                            """, unsafe_allow_html=True)
+                            """), unsafe_allow_html=True)
 
-                            # 4. Key Points (분석 노트)
+                            # 4. Key Points
                             st.markdown("<br>", unsafe_allow_html=True)
                             st.markdown("### 📌 Analytic Notes")
                             for point in res.get("key_points", []):
