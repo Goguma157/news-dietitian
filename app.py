@@ -5,6 +5,7 @@ import json
 import requests
 import time
 import re
+import html
 
 # ==========================================
 # 1. 기본 설정 및 CSS 스타일 (전문가 모드 적용)
@@ -457,7 +458,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Professional UI Updated) ---
+# --- TAB 2: Comparison Mode (Professional UI Updated + HTML Fix) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -532,12 +533,14 @@ with tab2:
                     with st.spinner(txt["analyzing"]):
                         res = compare_news_groq(art_a.title, art_b.title, region_code)
                         if res:
-                            # 1. 핵심 차이 (리포트 제목처럼)
+                            # 1. 핵심 차이 (리포트 제목) - HTML 특수문자 변환 적용
+                            core_diff_safe = html.escape(res['core_difference'])
+                            
                             st.markdown(f"""
                             <div style="text-align: center; margin-bottom: 40px; padding: 20px;">
                                 <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; font-weight:700;">Comparative Analysis Report</div>
                                 <div style="font-family: 'Merriweather', serif; font-size: 28px; font-weight: 900; color: #111; line-height:1.3;">
-                                    "{res['core_difference']}"
+                                    "{core_diff_safe}"
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
@@ -545,8 +548,16 @@ with tab2:
                             # 2. Paper Style 비교 UI (전문가 느낌)
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
-                            src_a = art_a.title.rsplit(' - ', 1)[1] if ' - ' in art_a.title else "Source A"
-                            src_b = art_b.title.rsplit(' - ', 1)[1] if ' - ' in art_b.title else "Source B"
+                            
+                            # 데이터 안전하게 변환 (HTML 깨짐 방지)
+                            src_a = html.escape(art_a.title.rsplit(' - ', 1)[1]) if ' - ' in art_a.title else "Source A"
+                            src_b = html.escape(art_b.title.rsplit(' - ', 1)[1]) if ' - ' in art_b.title else "Source B"
+                            title_a = html.escape(art_a.title)
+                            title_b = html.escape(art_b.title)
+                            summary_a = html.escape(res['article_a']['summary'])
+                            summary_b = html.escape(res['article_b']['summary'])
+                            label_a = html.escape(res['article_a']['stance_label'])
+                            label_b = html.escape(res['article_b']['stance_label'])
                             
                             st.markdown(f"""
                             <div class="compare-container">
@@ -556,12 +567,12 @@ with tab2:
                                         <span style="margin: 0 10px; color: #ddd;">|</span>
                                         {src_a}
                                     </div>
-                                    <div class="news-title">{art_a.title}</div>
+                                    <div class="news-title">{title_a}</div>
                                     <div class="news-summary">
-                                        {res['article_a']['summary']}
+                                        {summary_a}
                                     </div>
                                     <div class="stat-box">
-                                        <span>STANCE: <b>{res['article_a']['stance_label']}</b></span>
+                                        <span>STANCE: <b>{label_a}</b></span>
                                         <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 2px; font-weight:bold;">Score: {score_a}</span>
                                     </div>
                                 </div>
@@ -576,12 +587,12 @@ with tab2:
                                         <span style="margin: 0 10px; color: #ddd;">|</span>
                                         {src_b}
                                     </div>
-                                    <div class="news-title" style="border-bottom-color: #c0392b;">{art_b.title}</div>
+                                    <div class="news-title" style="border-bottom-color: #c0392b;">{title_b}</div>
                                     <div class="news-summary">
-                                        {res['article_b']['summary']}
+                                        {summary_b}
                                     </div>
                                     <div class="stat-box">
-                                        <span>STANCE: <b>{res['article_b']['stance_label']}</b></span>
+                                        <span>STANCE: <b>{label_b}</b></span>
                                         <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 2px; font-weight:bold;">Score: {score_b}</span>
                                     </div>
                                 </div>
@@ -603,7 +614,9 @@ with tab2:
                             st.markdown(f"""
                             <div style="position: relative; height: 50px; margin-top: 20px; width: 100%;">
                                 <div style="position: absolute; top: 50%; width: 100%; height: 1px; background: #bbb;"></div>
-                                <div style="position: absolute; top: 35%; left: 50%; width: 1px; height: 15px; background: #999;"></div> <div style="position: absolute; left: {pos_a}%; top: 50%; transform: translate(-50%, -50%); transition: left 1s;">
+                                <div style="position: absolute; top: 35%; left: 50%; width: 1px; height: 15px; background: #999;"></div>
+                                
+                                <div style="position: absolute; left: {pos_a}%; top: 50%; transform: translate(-50%, -50%); transition: left 1s;">
                                     <div style="width: 14px; height: 14px; background: #2c3e50; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
                                     <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: #2c3e50;">A</div>
                                 </div>
@@ -624,7 +637,8 @@ with tab2:
                             st.markdown("<br>", unsafe_allow_html=True)
                             st.markdown("### 📌 Analytic Notes")
                             for point in res.get("key_points", []):
-                                st.markdown(f"<div style='margin-bottom:8px; color:#444;'>• {point}</div>", unsafe_allow_html=True)
+                                safe_point = html.escape(point)
+                                st.markdown(f"<div style='margin-bottom:8px; color:#444;'>• {safe_point}</div>", unsafe_allow_html=True)
 
                 else:
                     st.warning("⚠️ 정확히 2개의 기사를 선택해주세요. (Please select exactly 2 articles)")
