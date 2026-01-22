@@ -6,10 +6,10 @@ import requests
 import time
 import re
 import html
-import textwrap  # <--- 이 줄을 꼭 추가해주세요! (들여쓰기 제거용)
+import textwrap
 
 # ==========================================
-# 1. 기본 설정 및 CSS 스타일 (전문가 모드 적용)
+# 1. 기본 설정 및 CSS 스타일 (전문가 모드)
 # ==========================================
 st.set_page_config(page_title="News Dietitian : Analyst Mode", page_icon="📰", layout="wide")
 
@@ -21,12 +21,12 @@ st.markdown("""
     html, body, [class*="css"] { 
         font-family: 'Roboto', sans-serif !important; 
         color: #222;
-        background-color: #f9f9f9; /* 눈이 편한 미색 배경 */
+        background-color: #f9f9f9;
     }
     
     h1, h2, h3 { font-family: 'Merriweather', serif !important; color: #1a1a1a; letter-spacing: -0.5px; }
 
-    /* --- 탭 스타일 (미니멀리즘) --- */
+    /* --- 탭 스타일 --- */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
@@ -43,17 +43,17 @@ st.markdown("""
         border-bottom: 3px solid #1a1a1a;
     }
 
-    /* --- 카드 컨테이너 (기존 박스 스타일 제거) --- */
+    /* --- 카드 컨테이너 --- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
-        border-radius: 0px; /* 각진 모서리로 전문성 강조 */
+        border-radius: 0px; 
         padding: 24px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         margin-bottom: 16px;
     }
 
-    /* --- [NEW] Compare UI: Paper Style --- */
+    /* --- [Compare UI] Paper Style --- */
     .compare-container {
         display: flex;
         justify-content: space-between;
@@ -90,7 +90,7 @@ st.markdown("""
         color: #111;
         line-height: 1.4;
         margin-bottom: 25px;
-        border-bottom: 3px solid #111; /* 제목 아래 굵은 선 포인트 */
+        border-bottom: 3px solid #111;
         padding-bottom: 20px;
     }
 
@@ -206,7 +206,7 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 4. AI 분석 로직
+# 4. AI 분석 로직 (Deep Dive 추가됨)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
@@ -223,8 +223,9 @@ def analyze_news_groq(news_text, region_code):
     Output JSON format ONLY.
     """
     
+    # [UPDATE] deep_dive 항목 추가
     user_prompt = f"""
-    [Article]: {news_text[:2500]}
+    [Article]: {news_text[:3000]}
     
     [Output Format (JSON Only)]:
     {{
@@ -244,6 +245,11 @@ def analyze_news_groq(news_text, region_code):
             "stated": "Explicit Claim",
             "hidden": "Implicit Bias/Context",
             "rating": "FACT" or "MIXED" or "OPINION"
+        }},
+        "deep_dive": {{
+            "background_context": "Historical background or situation explaining why this news matters (2-3 sentences)",
+            "fact_check": "Verification of key claims or clarifying potentially misleading statistics",
+            "missing_perspective": "What viewpoints or stakeholders are omitted in this article?"
         }}
     }}
     """
@@ -379,7 +385,7 @@ except:
 # ==========================================
 tab1, tab2 = st.tabs(["📰 Daily Briefing", "⚖️ Analyst Compare"])
 
-# --- TAB 1: Daily Feed ---
+# --- TAB 1: Daily Feed (with Deep Dive) ---
 with tab1:
     if news and news.entries:
         cols = st.columns(2)
@@ -441,6 +447,22 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
 
+                            # [UPDATE] 더 알아보기 (Deep Dive)
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            with st.expander("🔍 더 알아보기 (DEEP DIVE & FACTS)"):
+                                deep_dive = res.get("deep_dive", {})
+                                
+                                st.markdown("#### 📖 Context & Background")
+                                st.info(deep_dive.get("background_context", "N/A"))
+                                
+                                st.markdown("#### ✅ Fact Check & Clarification")
+                                st.success(deep_dive.get("fact_check", "N/A"))
+                                
+                                st.markdown("#### ⚖️ Missing Perspectives")
+                                st.warning(deep_dive.get("missing_perspective", "N/A"))
+                                
+                                st.caption("※ 이 분석은 AI가 기사 내용을 바탕으로 생성한 맥락 정보입니다.")
+
                             st.markdown("<div style='margin-top:20px; font-size:11px; font-weight:700; color:#ccc; letter-spacing:1px;'>INTERACTIVE Q&A</div>", unsafe_allow_html=True)
                             if article_id not in st.session_state.chat_history: st.session_state.chat_history[article_id] = []
                             
@@ -459,7 +481,7 @@ with tab1:
                                     st.rerun()
                     st.link_button("ORIGINAL SOURCE ↗", entry.link, use_container_width=True)
 
-# --- TAB 2: Comparison Mode (Final Fix for HTML Rendering) ---
+# --- TAB 2: Comparison Mode (Fixed HTML Rendering) ---
 with tab2:
     if region_code == "KR":
         txt = {
@@ -546,11 +568,10 @@ with tab2:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # 2. Paper Style 비교 UI (HTML 생성 후 공백 제거 트릭 적용)
+                            # 2. Paper Style 비교 UI (HTML 생성 후 공백 제거 적용)
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
                             
-                            # 데이터 안전 변환
                             src_a = html.escape(art_a.title.rsplit(' - ', 1)[1]) if ' - ' in art_a.title else "Source A"
                             src_b = html.escape(art_b.title.rsplit(' - ', 1)[1]) if ' - ' in art_b.title else "Source B"
                             title_a = html.escape(art_a.title)
@@ -559,9 +580,6 @@ with tab2:
                             summary_b = html.escape(res['article_b']['summary'])
                             label_a = html.escape(res['article_a']['stance_label'])
                             label_b = html.escape(res['article_b']['stance_label'])
-                            
-                            # [핵심 수정] HTML을 하나의 긴 문자열로 만들고, .replace('\n', '')로 줄바꿈을 모두 없앱니다.
-                            # 이렇게 하면 Markdown 파서가 '코드 블록'으로 인식할 여지가 아예 사라집니다.
                             
                             html_content = f"""
                             <div class="compare-container">
@@ -602,10 +620,8 @@ with tab2:
                                 </div>
                             </div>
                             """
-                            
-                            # 🔥 줄바꿈을 공백으로 치환하여 코드 블록 인식 방지 (The Fix)
+                            # 줄바꿈 제거 (.replace)로 코드 블록 인식 방지
                             st.markdown(html_content.replace("\n", ""), unsafe_allow_html=True)
-
 
                             # 링크 버튼
                             c1, c2, c3 = st.columns([1, 0.1, 1])
@@ -640,7 +656,6 @@ with tab2:
                                 <span>SUPPORTIVE / RIGHT (+10) ▶</span>
                             </div>
                             """
-                            # 여기도 안전하게 줄바꿈 제거 적용
                             st.markdown(spectrum_html.replace("\n", ""), unsafe_allow_html=True)
 
                             # 4. Key Points
