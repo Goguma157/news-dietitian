@@ -9,7 +9,7 @@ import html
 import textwrap
 
 # ==========================================
-# 1. 기본 설정 및 CSS 스타일 (전문가 모드)
+# 1. 기본 설정 및 CSS 스타일 (전문가 모드 + Deep Dive 스타일 추가)
 # ==========================================
 st.set_page_config(page_title="News Dietitian : Analyst Mode", page_icon="📰", layout="wide")
 
@@ -43,7 +43,7 @@ st.markdown("""
         border-bottom: 3px solid #1a1a1a;
     }
 
-    /* --- 카드 컨테이너 --- */
+    /* --- 기본 카드 컨테이너 --- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
@@ -65,95 +65,51 @@ st.markdown("""
         position: relative;
         margin-bottom: 30px;
     }
-
-    .paper-card {
-        flex: 1;
-        background: transparent;
-    }
-
-    .news-meta {
-        font-family: 'Roboto', sans-serif;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        color: #999;
-        margin-bottom: 15px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-    }
-    
-    .news-title {
-        font-family: 'Merriweather', serif;
-        font-size: 24px;
-        font-weight: 900;
-        color: #111;
-        line-height: 1.4;
-        margin-bottom: 25px;
-        border-bottom: 3px solid #111;
-        padding-bottom: 20px;
-    }
-
-    .news-summary {
-        font-family: 'Merriweather', serif;
-        font-size: 15px;
-        line-height: 1.8;
-        color: #444;
-        font-weight: 300;
-    }
-
-    .stat-box {
-        margin-top: 25px;
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 12px;
-        color: #666;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    /* --- 중앙 구분선 --- */
-    .divider-vertical {
-        width: 1px;
-        background-color: #e0e0e0;
-        position: relative;
-    }
-    
+    .paper-card { flex: 1; background: transparent; }
+    .divider-vertical { width: 1px; background-color: #e0e0e0; position: relative; }
     .vs-badge-minimal {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: #fff;
-        color: #bbb;
-        border: 1px solid #e0e0e0;
-        padding: 6px 8px;
-        font-size: 10px;
-        font-weight: bold;
-        letter-spacing: 1px;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background-color: #fff; color: #bbb; border: 1px solid #e0e0e0;
+        padding: 6px 8px; font-size: 10px; font-weight: bold; letter-spacing: 1px;
+        border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* --- [NEW] Deep Dive UI (전문가 메모 스타일) --- */
+    .deep-dive-box {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-left: 4px solid #34495e; /* 포인트 컬러 (차분한 네이비) */
+        padding: 20px;
+        margin-top: 10px;
+        font-family: 'Roboto', sans-serif;
+    }
+    .deep-dive-header {
+        font-family: 'Merriweather', serif;
+        font-size: 13px;
+        font-weight: 900;
+        color: #2c3e50;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 6px;
     }
-
-    /* --- 기타 유틸리티 --- */
+    .deep-dive-content {
+        font-size: 14px;
+        color: #444;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        font-weight: 400;
+    }
+    .deep-dive-content:last-child { margin-bottom: 0; }
+    
+    /* --- 유틸리티 --- */
     .badge-source { 
-        background-color: #f4f4f4; 
-        color: #555; 
-        padding: 4px 8px; 
-        font-size: 10px; 
-        font-weight: 700; 
-        text-transform: uppercase; 
-        border-radius: 2px; 
-        margin-right: 6px; 
-        border: 1px solid #ddd;
+        background-color: #f4f4f4; color: #555; padding: 4px 8px; 
+        font-size: 10px; font-weight: 700; text-transform: uppercase; 
+        border-radius: 2px; margin-right: 6px; border: 1px solid #ddd;
     }
-
     .insight-box {
         background-color: #f9f9f9;
         border-left: 3px solid #2c3e50;
@@ -164,14 +120,13 @@ st.markdown("""
         color: #333;
         margin-top: 15px;
     }
-    
     .chat-user { text-align: right; margin: 8px 0; color: #666; font-size: 13px; font-style: italic; }
     .chat-ai { text-align: left; margin: 8px 0; font-weight: 600; color: #111; font-size: 13px; font-family: 'Merriweather', serif; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 메이저 언론사 리스트 (필터링용)
+# 2. 메이저 언론사 리스트
 # ==========================================
 MAJOR_KR = ["조선일보", "중앙일보", "동아일보", "한겨레", "경향신문", "한국일보", "매일경제", "한국경제", "KBS", "MBC", "SBS", "JTBC", "YTN", "연합뉴스"]
 MAJOR_US = ["CNN", "Fox News", "New York Times", "Washington Post", "Reuters", "Associated Press", "BBC", "NBC", "CNBC", "Bloomberg", "USA Today", "Wall Street Journal"]
@@ -206,13 +161,14 @@ def safe_parse_json(raw_text):
     return None
 
 # ==========================================
-# 4. AI 분석 로직 (Deep Dive 추가됨)
+# 4. AI 분석 로직 (한자 금지 명령 추가)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def analyze_news_groq(news_text, region_code):
     
     if region_code == "KR":
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY."
+        # [수정] 한자 금지 및 한글 사용 강제 명령 강화
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Chinese characters (Hanja) under any circumstances. Translate any Hanja terms to Hangul immediately."
     else:
         lang_instruction = "Answer strictly in English."
     
@@ -223,7 +179,6 @@ def analyze_news_groq(news_text, region_code):
     Output JSON format ONLY.
     """
     
-    # [UPDATE] deep_dive 항목 추가
     user_prompt = f"""
     [Article]: {news_text[:3000]}
     
@@ -271,7 +226,8 @@ def analyze_news_groq(news_text, region_code):
 @st.cache_data(show_spinner=False)
 def compare_news_groq(text_a, text_b, region_code):
     if region_code == "KR":
-        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY."
+        # [수정] 한자 금지 명령 강화
+        lang_instruction = "Answer strictly in Korean. Use Hangul ONLY. Do NOT use Hanja."
         target_lang = "Korean"
     else:
         lang_instruction = "Answer strictly in English."
@@ -385,7 +341,7 @@ except:
 # ==========================================
 tab1, tab2 = st.tabs(["📰 Daily Briefing", "⚖️ Analyst Compare"])
 
-# --- TAB 1: Daily Feed (with Deep Dive) ---
+# --- TAB 1: Daily Feed (Updated Deep Dive UI) ---
 with tab1:
     if news and news.entries:
         cols = st.columns(2)
@@ -447,21 +403,34 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # [UPDATE] 더 알아보기 (Deep Dive)
+                            # [UPDATE] 더 알아보기 (Deep Dive) - 전문적인 UI로 교체
                             st.markdown("<br>", unsafe_allow_html=True)
-                            with st.expander("🔍 더 알아보기 (DEEP DIVE & FACTS)"):
+                            with st.expander("🔍 DEEP DIVE (Context & Facts)"):
                                 deep_dive = res.get("deep_dive", {})
                                 
-                                st.markdown("#### 📖 Context & Background")
-                                st.info(deep_dive.get("background_context", "N/A"))
-                                
-                                st.markdown("#### ✅ Fact Check & Clarification")
-                                st.success(deep_dive.get("fact_check", "N/A"))
-                                
-                                st.markdown("#### ⚖️ Missing Perspectives")
-                                st.warning(deep_dive.get("missing_perspective", "N/A"))
-                                
-                                st.caption("※ 이 분석은 AI가 기사 내용을 바탕으로 생성한 맥락 정보입니다.")
+                                # 전문적인 'Memo' 스타일로 디자인 적용
+                                html_content = f"""
+                                <div class="deep-dive-box">
+                                    <div class="deep-dive-header">📖 Context & Background</div>
+                                    <div class="deep-dive-content">
+                                        {deep_dive.get("background_context", "N/A")}
+                                    </div>
+
+                                    <div class="deep-dive-header" style="color:#27ae60;">✅ Fact Check & Clarification</div>
+                                    <div class="deep-dive-content">
+                                        {deep_dive.get("fact_check", "N/A")}
+                                    </div>
+
+                                    <div class="deep-dive-header" style="color:#e67e22;">⚖️ Missing Perspectives</div>
+                                    <div class="deep-dive-content">
+                                        {deep_dive.get("missing_perspective", "N/A")}
+                                    </div>
+                                    <div style="font-size:11px; color:#999; text-align:right; margin-top:10px;">
+                                        Generated by News Dietitian AI Analyst
+                                    </div>
+                                </div>
+                                """
+                                st.markdown(html_content, unsafe_allow_html=True)
 
                             st.markdown("<div style='margin-top:20px; font-size:11px; font-weight:700; color:#ccc; letter-spacing:1px;'>INTERACTIVE Q&A</div>", unsafe_allow_html=True)
                             if article_id not in st.session_state.chat_history: st.session_state.chat_history[article_id] = []
@@ -568,7 +537,7 @@ with tab2:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # 2. Paper Style 비교 UI (HTML 생성 후 공백 제거 적용)
+                            # 2. Paper Style 비교 UI
                             score_a = res['article_a'].get('stance_score', 0)
                             score_b = res['article_b'].get('stance_score', 0)
                             
@@ -620,7 +589,6 @@ with tab2:
                                 </div>
                             </div>
                             """
-                            # 줄바꿈 제거 (.replace)로 코드 블록 인식 방지
                             st.markdown(html_content.replace("\n", ""), unsafe_allow_html=True)
 
                             # 링크 버튼
